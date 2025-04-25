@@ -42,10 +42,10 @@ namespace LuminaInterpreter
 
     public class Context
     {
-        public Stack<Value> ArgStack = new();
-        public Stack<Frame> CallStack = new();
-        public List<Assembly> ImportedAssemblies = new();
-        public HashSet<string> DisabledTokens = new(StringComparer.OrdinalIgnoreCase);
+        public Stack<Value> ArgStack = new Stack<Value>();
+        public Stack<Frame> CallStack = new Stack<Frame>();
+        public List<Assembly> ImportedAssemblies = new List<Assembly>();
+        public HashSet<string> DisabledTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public bool Reverse = false;
         public Value LastReturn = Value.FromNumber(0);
 
@@ -69,25 +69,21 @@ namespace LuminaInterpreter
             if (DisabledTokens.Contains(name))
                 throw new Exception($"Unknown function: {name}");
 
-            // Built-ins
             if (BuiltIns.Map.TryGetValue(name, out var bi))
             {
-                LastReturn = bi(this, new());
+                LastReturn = bi(this, new List<Value>());
                 return;
             }
-            // Script functions
             if (Function.Definitions.TryGetValue(name, out var fn))
             {
                 Call(fn);
                 return;
             }
-            // .NET imports
             foreach (var asm in ImportedAssemblies)
             {
                 foreach (var type in asm.GetTypes())
                 {
-                    var m = type.GetMethod(name,
-                        BindingFlags.Public | BindingFlags.Static);
+                    var m = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static);
                     if (m == null) continue;
 
                     object raw;
@@ -101,16 +97,11 @@ namespace LuminaInterpreter
 
                     LastReturn = m.ReturnType switch
                     {
-                        _ when m.ReturnType == typeof(void)
-                            => Value.FromNumber(0),
-                        _ when m.ReturnType == typeof(string)
-                            => Value.FromString((string)raw),
-                        _ when m.ReturnType == typeof(bool)
-                            => Value.FromBoolean((bool)raw),
-                        _ when m.ReturnType.IsPrimitive
-                            => Value.FromNumber(Convert.ToInt64(raw)),
-                        _ when m.ReturnType == typeof(Value)
-                            => (Value)raw,
+                        Type t when t == typeof(void) => Value.FromNumber(0),
+                        Type t when t == typeof(string) => Value.FromString((string)raw),
+                        Type t when t == typeof(bool) => Value.FromBoolean((bool)raw),
+                        Type t when t.IsPrimitive => Value.FromNumber(Convert.ToInt64(raw)),
+                        Type t when t == typeof(Value) => (Value)raw,
                         _ => throw new Exception($"Unsupported return type {m.ReturnType}")
                     };
                     return;
@@ -128,7 +119,7 @@ namespace LuminaInterpreter
 
     public class Frame
     {
-        public Dictionary<string, Value> Variables = new();
+        public Dictionary<string, Value> Variables = new Dictionary<string, Value>();
         public Value Lookup(string name)
         {
             if (!Variables.TryGetValue(name, out var v))
@@ -140,8 +131,8 @@ namespace LuminaInterpreter
     public class Function
     {
         public string Name;
-        public List<Statement> Body = new();
-        public static Dictionary<string, Function> Definitions = new();
+        public List<Statement> Body = new List<Statement>();
+        public static Dictionary<string, Function> Definitions = new Dictionary<string, Function>();
         public Function(string name) { Name = name; }
     }
 
@@ -194,9 +185,7 @@ namespace LuminaInterpreter
             {
                 if (Prec.ContainsKey(t))
                 {
-                    while (ops.Count > 0
-                        && Prec.ContainsKey(ops.Peek())
-                        && Prec[ops.Peek()] >= Prec[t])
+                    while (ops.Count > 0 && Prec.ContainsKey(ops.Peek()) && Prec[ops.Peek()] >= Prec[t])
                         outq.Add(ops.Pop());
                     ops.Push(t);
                 }
@@ -229,26 +218,22 @@ namespace LuminaInterpreter
                     if (ctx.DisabledTokens.Contains(tok))
                         throw new Exception($"Unknown token: {tok}");
                     if (st.Count < 2) throw new Exception("Bad expression");
-                    var b = st.Pop(); var a = st.Pop();
-                    Value res = tok switch
+                    var b = st.Pop();
+                    var a = st.Pop();
+                    var res = tok switch
                     {
                         "+" when a.Type == ValueType.Number && b.Type == ValueType.Number
                             => Value.FromNumber(a.Number + b.Number),
                         "+" => Value.FromString(a.ToString() + b.ToString()),
-
                         "-" when a.Type == ValueType.Number && b.Type == ValueType.Number
                             => Value.FromNumber(a.Number - b.Number),
-
                         "*" when a.Type == ValueType.Number && b.Type == ValueType.Number
                             => Value.FromNumber(a.Number * b.Number),
-
                         "/" when a.Type == ValueType.Number && b.Type == ValueType.Number && b.Number != 0
                             => Value.FromNumber(a.Number / b.Number),
                         "/" => throw new DivideByZeroException(),
-
                         "%" when a.Type == ValueType.Number && b.Type == ValueType.Number
                             => Value.FromNumber(a.Number % b.Number),
-
                         _ => throw new Exception($"Unknown operator: {tok}")
                     };
                     st.Push(res);
@@ -274,8 +259,8 @@ namespace LuminaInterpreter
         {
             if (ctx.DisabledTokens.Contains(tok))
                 throw new Exception($"Unknown token: {tok}");
-            if (ctx.CurrentFrame.Variables.ContainsKey(tok))
-                return ctx.CurrentFrame.Lookup(tok);
+            if (ctx.CurrentFrame.Variables.TryGetValue(tok, out var v))
+                return v;
             if (tok.StartsWith("\"") && tok.EndsWith("\"") && tok.Length >= 2)
                 return Value.FromString(tok[1..^1]);
             if (tok.Equals("TRUE", StringComparison.OrdinalIgnoreCase))
@@ -295,8 +280,7 @@ namespace LuminaInterpreter
           {
               ["PRINTLINE"] = (ctx, args) =>
               {
-                  foreach (var v in args)
-                      Console.WriteLine(v.ToString());
+                  foreach (var v in args) Console.WriteLine(v.ToString());
                   return Value.FromNumber(0);
               }
           };
@@ -314,30 +298,59 @@ namespace LuminaInterpreter
         protected abstract void ExecuteImpl(Context ctx);
     }
 
+    public class ImportStmt : Statement
+    {
+        public override string Keyword => "IMPORT";
+        string Path;
+        public ImportStmt(string path) { Path = path; }
+        protected override void ExecuteImpl(Context ctx)
+        {
+            ctx.LoadAssembly(Path);
+        }
+    }
+
+    public class FunctionDefStmt : Statement
+    {
+        public override string Keyword => FnKeyword;
+        string FnKeyword, Name;
+        List<Statement> Body;
+        public FunctionDefStmt(string fnKeyword, string name, List<Statement> body)
+        {
+            FnKeyword = fnKeyword;
+            Name = name;
+            Body = body;
+        }
+        protected override void ExecuteImpl(Context ctx)
+        {
+            var f = new Function(Name);
+            f.Body.AddRange(Body);
+            Function.Definitions[Name] = f;
+        }
+    }
+
     public class AssignExprStmt : Statement
     {
         public override string Keyword => ":";
-        string VarName, Expr;
-        public AssignExprStmt(string varName, string expr)
-        { VarName = varName; Expr = expr; }
+        string Var, Expr;
+        public AssignExprStmt(string var, string expr) { Var = var; Expr = expr; }
         protected override void ExecuteImpl(Context ctx)
         {
             var val = ExpressionParser.EvaluateExpression(ctx, Expr);
-            ctx.CurrentFrame.Variables[VarName] = val;
+            ctx.CurrentFrame.Variables[Var] = val;
         }
     }
 
     public class InlineCallStmt : Statement
     {
         public override string Keyword => FuncName;
-        string FuncName; List<string> ArgExprs;
+        string FuncName;
+        List<string> Args;
         public InlineCallStmt(string fn, List<string> args)
-        { FuncName = fn; ArgExprs = args; }
+        { FuncName = fn; Args = args; }
         protected override void ExecuteImpl(Context ctx)
         {
-            var vals = ArgExprs
-                .Select(e => ExpressionParser.EvaluateExpression(ctx, e))
-                .ToList();
+            var vals = Args.Select(a => ExpressionParser.EvaluateExpression(ctx, a))
+                           .ToList();
             if (BuiltIns.Map.TryGetValue(FuncName, out var bi))
             {
                 ctx.LastReturn = bi(ctx, vals);
@@ -355,8 +368,8 @@ namespace LuminaInterpreter
         public DeleteStmt(string tok) { Token = tok; }
         protected override void ExecuteImpl(Context ctx)
         {
-            if (ctx.CurrentFrame.Variables.Remove(Token))
-                return;
+            ctx.CurrentFrame.Variables.Remove(Token);
+            Function.Definitions.Remove(Token);
             ctx.DisabledTokens.Add(Token);
         }
     }
@@ -384,69 +397,57 @@ namespace LuminaInterpreter
 
     public class Parser
     {
-        static readonly Regex TokenRx = new("\"[^\"]*\"|[^\\s]+");
+        static readonly Regex TokenRx = new Regex("\"[^\"]*\"|[^\\s]+");
         string[] Lines;
-        public List<string> Imports = new();
-        public List<Statement> TopLevel = new();
+        public List<Statement> TopLevel = new List<Statement>();
         int Index;
-
-        public Parser(string[] lines)
-        {
-            Lines = lines;
-            Index = 0;
-        }
+        public Parser(string[] lines) { Lines = lines; Index = 0; }
 
         public void Parse()
         {
-        CallStackBootstrap:
             while (Index < Lines.Length)
             {
-                var raw = Lines[Index++];
-                var ln = raw.Trim();
-                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
-                    continue;
-
+                var ln = Lines[Index++].Trim();
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
                 var parts = TokenRx.Matches(ln)
-                                .Cast<Match>()
-                                .Select(m => m.Value)
-                                .ToList();
-
-                if (parts[0].Equals("IMPORT", StringComparison.OrdinalIgnoreCase) && parts.Count == 2)
+                                  .Cast<Match>()
+                                  .Select(m => m.Value)
+                                  .ToList();
+                Statement stmt;
+                if (parts[0].Equals("IMPORT", StringComparison.OrdinalIgnoreCase))
                 {
-                    Imports.Add(parts[1].Trim('"'));
+                    stmt = new ImportStmt(parts[1].Trim('"'));
                 }
                 else if (IsFnKeyword(parts[0]) && parts.Count == 2)
                 {
-                    ParseFunction(parts[1]);
+                    stmt = ParseFunctionDef(parts[0], parts[1]);
                 }
                 else
                 {
-                    TopLevel.Add(ParseStmt(parts));
+                    stmt = ParseSimpleStmt(parts);
                 }
+                TopLevel.Add(stmt);
             }
         }
 
-        void ParseFunction(string name)
+        FunctionDefStmt ParseFunctionDef(string fnKw, string name)
         {
-            var func = new Function(name);
+            var body = new List<Statement>();
             while (Index < Lines.Length)
             {
-                var raw = Lines[Index++];
-                var ln = raw.Trim();
-                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
-                    continue;
-                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
-                    break;
+                var ln = Lines[Index++].Trim();
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
                 var parts = TokenRx.Matches(ln)
-                                .Cast<Match>()
-                                .Select(m => m.Value)
-                                .ToList();
-                func.Body.Add(ParseStmt(parts));
+                                  .Cast<Match>()
+                                  .Select(m => m.Value)
+                                  .ToList();
+                body.Add(ParseSimpleStmt(parts));
             }
-            Function.Definitions[name] = func;
+            return new FunctionDefStmt(fnKw, name, body);
         }
 
-        Statement ParseStmt(List<string> p)
+        Statement ParseSimpleStmt(List<string> p)
         {
             if (p[0].StartsWith("!"))
                 return new InlineCallStmt(p[0].Substring(1), p.Skip(1).ToList());
@@ -463,8 +464,7 @@ namespace LuminaInterpreter
 
         static bool IsFnKeyword(string token)
         {
-            var t = token.ToUpperInvariant();
-            var target = "FUNCTION";
+            string t = token.ToUpperInvariant(), target = "FUNCTION";
             int ti = 0, ki = 0;
             while (ti < t.Length && ki < target.Length)
             {
@@ -497,8 +497,6 @@ namespace LuminaInterpreter
 
             var ctx = new Context();
             ctx.CallStack.Push(new Frame());
-            foreach (var dll in parser.Imports)
-                ctx.LoadAssembly(dll);
 
             int ip = ctx.Reverse ? parser.TopLevel.Count - 1 : 0;
             while (ip >= 0 && ip < parser.TopLevel.Count)

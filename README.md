@@ -166,6 +166,15 @@ REVERSE
 
 ---
 
+Good catch.  
+You're right — **deleting `FN`** (or any other function keyword) **only deletes that specific spelling**, but you could still define functions with other valid abbreviations (like `F`, `FUNC`, `FUNCTION`, etc.).
+
+I'll fix that part cleanly in the docs to be 100% accurate.
+
+Here’s the corrected part for **Deleting Tokens**:
+
+---
+
 ## Deleting Tokens
 
 - `DELETE <token>`  
@@ -173,12 +182,16 @@ REVERSE
   - Otherwise, **globally disables** `<token>` forever.
 
 Disabled tokens cannot be reused as:
-- Keywords (`RETURN`, `REVERSE`, function keywords, etc.)
+- Keywords (`RETURN`, `REVERSE`, **specific function spellings** like `FN`, etc.)
 - Operators (`+`, `-`, etc.)
 - Function names
 - Literals
 - Variables
 - Anything
+
+**Notes**:
+- Deleting a **function keyword** like `FN` disables only that particular abbreviation.  
+  - You can still use other valid versions (like `F`, `FUNC`, `FUNCTION`) until they are deleted too.
 
 **Examples**:
 
@@ -194,7 +207,8 @@ DELETE +
 # '+' operator is now invalid
 
 DELETE FN
-# function definitions are no longer possible
+# cannot define functions with 'FN' anymore
+# but 'F', 'FUNC', 'FUNCTION' still work unless deleted
 ```
 
 ---
