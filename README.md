@@ -1,11 +1,4 @@
-﻿Alright, I'll integrate everything you just wrote — **lifetimes**, **flexible string syntax**, **number names**, etc. —  
-and then rewrite the whole Lumina documentation to be *cool*, *tight*, and *easy to read* while keeping the **raw creative energy** you have. ⚡
-
-Here’s the new, fully refreshed doc:
-
----
-
-# 🌟 Lumina Language
+﻿# 🌟 Lumina Language
 
 Lumina is a lightweight, dynamic, and chaotic programming language featuring:
 
@@ -24,17 +17,17 @@ Lumina is a lightweight, dynamic, and chaotic programming language featuring:
 
 ## 📚 Table of Contents
 
-- [Directives](#directives)  
-- [Functions](#functions)  
-- [Top-level Statements](#top-level-statements)  
-- [Variables, Assignment, and Lifetimes](#variables-assignment-and-lifetimes)  
-- [Strings](#strings)  
-- [Expressions Everywhere](#expressions-everywhere)  
-- [Supported Literals and Types](#supported-literals-and-types)  
-- [Built-in and Inline Calls](#built-in-and-inline-calls)  
-- [Reversing Execution](#reversing-execution)  
-- [Deleting Tokens](#deleting-tokens)  
-- [Error Handling](#error-handling)  
+- [Directives](#-directives)
+- [Functions](#-functions)
+- [Top-level Statements](#-top-level-statements)
+- [Variables, Assignment, and Lifetimes](#-variables-assignment-and-lifetimes)
+- [Strings](#-strings)
+- [Expressions Everywhere](#-expressions-everywhere)
+- [Supported Literals and Types](#-supported-literals-and-types)
+- [Built-in and Inline Calls](#-built-in-and-inline-calls)
+- [Reversing Execution](#-reversing-execution)
+- [Deleting Tokens](#-deleting-tokens)
+- [Error Handling](#-error-handling)
 
 ---
 
@@ -83,14 +76,13 @@ Lumina is a lightweight, dynamic, and chaotic programming language featuring:
   ```
 
 - **Note**:  
-  Functions are **only run when called**.  
-  There's no automatic `MAIN`.
+  Functions only run when called. No automatic `MAIN`.
 
 ---
 
 ## 🏃 Top-level Statements
 
-Anything outside a function runs **instantly** when encountered:
+Anything outside a function runs **immediately** when encountered:
 
 ```text
 !PRINTLINE "Hello world"
@@ -109,7 +101,7 @@ x: 10
   ```
 
 - **Anything can be a name**:  
-  Numbers, emojis, symbols — even full sentences.
+  Numbers, emojis, symbols, full sentences.
 
   ```text
   😂: "hello"
@@ -120,9 +112,9 @@ x: 10
 ### Lifetimes
 - Variables can **expire** automatically:
 
-  - **`X 2: 5`** → exists for **2 lines**  
-  - **`B 5s: "hey"`** → exists for **5 seconds**  
-  - **`B -3: '''bye'''`** → existed 3 lines ago; gets deleted **now**
+  - `X 2: 5` → exists for **2 lines**
+  - `B 5s: "hey"` → exists for **5 seconds**
+  - `B -3: '''bye'''` → existed 3 lines ago, deleted **now**
 
   **Examples**:
   ```text
@@ -136,16 +128,16 @@ x: 10
 ## ✨ Strings
 
 - **Multi-quote support**:  
-  Triple, quadruple, or any amount of `"` or `'` is valid.
+  Triple, quadruple, or any number of `"` or `'` is valid.
 - **No quotes needed**:  
   If a matching variable exists, it's used automatically.
 
   **Examples**:
   ```text
-  """HELLO"""   # a real string
+  """HELLO"""   # real string
 
   !PRINTLINE hello
-  # If variable `hello` exists, it's used.
+  # if variable "hello" exists, it's used
   ```
 
 ---
@@ -154,7 +146,7 @@ x: 10
 
 - Math operators: `+`, `-`, `*`, `/`, `%`
 - Grouping: `(` `)`  
-- Expressions can appear **anywhere** — assignments, returns, function calls.
+- Expressions appear **everywhere** — assignments, returns, function calls.
 
 ---
 
@@ -165,15 +157,15 @@ x: 10
 - **Booleans**: `TRUE`, `FALSE`
 - **Number names** (automatic mappings):
   ```text
-  one  → 1
-  two  → 2
+  one   → 1
+  two   → 2
   three → 3
   ```
 
   **Example**:
   ```text
-  !PRINTLINE one    # prints 1
-  !PRINTLINE two+two # prints 4
+  !PRINTLINE one       # prints 1
+  !PRINTLINE two+two   # prints 4
   ```
 
 ---
@@ -182,20 +174,20 @@ x: 10
 
 - **Call syntax**:
   ```text
-  !FunctionName <expr> [<expr> …]
+  !FunctionName <expr> [<expr> ...]
   ```
 
 - **Built-in**:
-  - `!PRINTLINE <value>` → prints the evaluated value(s)
+  - `!PRINTLINE <value>` → prints evaluated value(s)
 
 - **External**:
-  - Any public static function from imported .NET assemblies.
+  - Any public static method from imported .NET assemblies.
 
 ---
 
 ## 🔄 Reversing Execution
 
-- `REVERSE` switches **program flow direction**.
+- `REVERSE` flips the program execution direction.
 
 Example:
 
@@ -216,72 +208,53 @@ REVERSE
 ```
 
 **How it works**:  
-- Print `1`, then `2`.
-- `REVERSE` triggers.
+- Prints `1`, then `2`.
+- `REVERSE` is hit.
 - Now runs upward: `2`, then `1` again.
 
 *Yes — REVERSE can cause multiple visits!*
 
 ---
 
-🔥 Okay — you want to allow and **document** that you can `DELETE DELETE` itself.
-
-Meaning:  
-- After `DELETE DELETE`, you **can no longer delete** anything at all anymore!
-
-Super powerful and dangerous, so let's explain it clearly.
-
-I'll add it right inside the **Deleting Tokens** section, and also show a small example:
-
----
-
-## Deleting Tokens
+## 🚫 Deleting Tokens
 
 - `DELETE <token>`  
-  - If `<token>` is a **variable**, deletes only that variable.
-  - Otherwise, **globally disables** `<token>` forever.
+  - If a **variable**, deletes only that instance.
+  - Otherwise, **globally disables** the token forever.
 
 Disabled tokens cannot be reused as:
-- Keywords (`RETURN`, `REVERSE`, **specific function spellings** like `FN`, etc.)
+- Keywords (`RETURN`, `REVERSE`, `FUNCTION`, etc.)
 - Operators (`+`, `-`, etc.)
 - Function names
 - Literals
 - Variables
 - Anything
 
-**Special Behavior**:
-- You can `DELETE DELETE`.  
-  After doing so, no more tokens can be deleted for the rest of the program.
-
-**Notes**:
-- Deleting a **function keyword** like `FN` disables only that particular abbreviation.  
-  Other spellings (`F`, `FUNC`, `FUNCTION`, etc.) still work unless separately deleted.
+### Special:
+- You can `DELETE DELETE` itself.  
+  After that, no more deletions are possible.
 
 **Examples**:
-
 ```text
 3: 55
 DELETE 3
-!PRINTLINE 3      # prints the literal number 3
+!PRINTLINE 3      # prints literal 3
 
 DELETE RETURN
-# any future RETURN will cause an error
+# RETURN now disabled
 
 DELETE +
-# '+' operator is now invalid
+# '+' operator invalid forever
 
 DELETE FN
-# cannot define functions with 'FN' anymore
-# but 'F', 'FUNC', 'FUNCTION' still work
+# can't define functions with 'FN' anymore
 
 DELETE DELETE
-# now the DELETE keyword itself is disabled
-# no further tokens can be deleted after this
+# now DELETE is gone too
 ```
 
 ---
 
 ## ❗ Error Handling
 
-- Any error — undefined token, deleted keyword, bad math, etc. — **instantly aborts** execution with an error message.
-```
+- Any error — undefined token, deleted keyword, bad syntax, math errors — **instantly aborts** execution with an error message.
