@@ -1,19 +1,29 @@
 ﻿# Lumina Language
 
-Lumina is a lightweight dynamic programming language featuring full math expression support, unrestricted variable naming (numbers, emojis, symbols), live token deletion at runtime (even keywords and operators), inline function calls, and deep .NET interoperability via imports.
+Lumina is a lightweight dynamic programming language featuring:
 
-Designed for maximum flexibility, simplicity, and experimentation.
+- full math expression support everywhere  
+- unrestricted variable naming (numbers, emojis, symbols)  
+- live token deletion at runtime (even keywords and operators)  
+- inline function calls  
+- deep .NET interoperability via `IMPORT`  
+- direct execution start (statements run as they appear)  
+- **execution reversal** via a `REVERSE` statement  
+
+*Now inspired by multiple ideas from [GulfOfMexico](https://github.com/TodePond/GulfOfMexico) (CREDITS).*
 
 ## Table of Contents
-- [Directives](#directives)
-- [Variables and Assignment](#variables-and-assignment)
-- [Expressions Everywhere](#expressions-everywhere)
-- [Supported Literals and Types](#supported-literals-and-types)
-- [Built-in and Inline Calls](#built-in-and-inline-calls)
-- [Function Calls](#function-calls)
-- [Return and Exit Codes](#return-and-exit-codes)
-- [Deleting Tokens](#deleting-tokens)
-- [Error Handling](#error-handling)
+
+- [Directives](#directives)  
+- [Functions](#functions)  
+- [Top-level Statements](#top-level-statements)  
+- [Variables and Assignment](#variables-and-assignment)  
+- [Expressions Everywhere](#expressions-everywhere)  
+- [Supported Literals and Types](#supported-literals-and-types)  
+- [Built-in and Inline Calls](#built-in-and-inline-calls)  
+- [Reversing Execution](#reversing-execution)  
+- [Deleting Tokens](#deleting-tokens)  
+- [Error Handling](#error-handling)  
 
 ---
 
@@ -22,23 +32,43 @@ Designed for maximum flexibility, simplicity, and experimentation.
 - `IMPORT "<path>"`  
   Load a .NET assembly for external function calls.
 
-- `DEFINE <Name> … END`  
-  Declare a new script function (including the required `MAIN` entrypoint).
+---
+
+## Functions
+
+- **Keyword**: any subsequence of **FUNCTION** (case-insensitive):  
+  e.g. `F`, `FN`, `FUNC`, `FCTION`, `FUNCTION`  
+- **Syntax**:
+  ```text
+  <FnKeyword> <Name>
+    …statements…
+  END
+  ```
+- **Note**: functions are only executed when called; there is no automatic `MAIN` entrypoint.
+
+---
+
+## Top-level Statements
+
+Any statement outside a function runs in program order:
+
+```text
+!PRINTLINE "Hello"
+x: 10
+!PRINTLINE x*2
+```
 
 ---
 
 ## Variables and Assignment
 
-- **Arbitrary names**:  
-  Variables can be numbers, emojis, symbols, mixed-case, anything.  
-  Examples:
+- **Arbitrary names**: numbers, emojis, symbols—anything.  
   ```text
-  X: 5
-  3: 55
-  😂: "hello world"
+  😂: "hello"
+  3:   55
+  $x!: 42
   ```
-
-- **Colon syntax** for assignment:  
+- **Colon syntax**:
   ```text
   VariableName: <expression>
   ```
@@ -47,108 +77,84 @@ Designed for maximum flexibility, simplicity, and experimentation.
 
 ## Expressions Everywhere
 
-- Numeric math operators:  
-  `+`, `-`, `*`, `/`, `%`  
-
-- Parentheses `(` `)` for grouping and precedence.  
-
-- Full expressions allowed in:
-  - Assignments
-  - Inline calls
-  - `RETURN` statements
-  - Example:
-    ```text
-    X: (4 + 5 * 2)
-    !PRINTLINE X / 3 + (Y - 1)
-    RETURN 3 + 55
-    ```
+- Operators: `+`, `-`, `*`, `/`, `%`  
+- Parentheses: `(` `)`  
+- Appear in assignments, inline calls, `RETURN`, etc.
 
 ---
 
 ## Supported Literals and Types
 
-- **Numbers**: e.g., `123`
-- **Strings**: `"hello world"`
+- **Numbers**: e.g. `123`  
+- **Strings**: `"hello world"`  
 - **Booleans**: `TRUE`, `FALSE`
 
 ---
 
 ## Built-in and Inline Calls
 
-- Syntax:
+- **Inline call**:
   ```text
-  !FunctionName <expression> [<expression> ...]
+  !FunctionName <expr> [<expr> …]
   ```
-- Built-in function:
-  - `!PRINTLINE <value>` — prints the evaluated value(s) to console.
+- **Built-in**:
+  - `!PRINTLINE <value>` — prints evaluated value(s) to console  
 
-- Additional built-ins can be added to the `BuiltIns` map in the engine.
+- **External**:
+  - Public static methods in imported .NET assemblies
 
 ---
 
-## Function Calls
+## Reversing Execution
 
-- **Inline Call** (to script or external functions):
+- **`REVERSE`**  
+  Toggles execution direction of top-level statements:
+
   ```text
-  !FuncName arg1 arg2 ...
+  !PRINTLINE 1
+  !PRINTLINE 2
+  REVERSE
+  !PRINTLINE 3
+  !PRINTLINE 4
   ```
-  - Arguments are evaluated expressions.
 
-- **External Functions**:  
-  From imported .NET DLLs (public static methods).
-
----
-
-## Return and Exit Codes
-
-- `RETURN <expression>`  
-  Stops execution and exits the host process with the evaluated value as the exit code (must be numeric).
+  runs in order: 1,2 then toggles, then 4,3.
 
 ---
 
 ## Deleting Tokens
 
-- `DELETE <token>`
+- `DELETE <token>`  
+  - If a **variable** named `<token>` exists → deletes it only.  
+  - Else → globally disables `<token>` forever.  
 
-  Deletes a token from the language.
+Disabled tokens cannot be used again as:
+- Keywords (`RETURN`, `REVERSE`, function keywords, etc.)  
+- Operators (`+`, `-`, etc.)  
+- Function names  
+- Literals (`"hello"`, `123`, etc.)  
+- Variables  
+- Anything else  
 
-  Behavior:
-  - If a **variable** with that name exists → deletes the variable only.
-  - If no such variable → **globally disables** the token.
-    - Disabled tokens **cannot** be used again as:
-      - Keywords
-      - Operators (`+`, `-`, etc.)
-      - Function names
-      - Literals
-      - Variables
-      - Anything else
+**Examples**:
+```text
+3: 55
+DELETE 3
+!PRINTLINE 3      # prints literal 3
 
-- **Examples:**
-  ```text
-  3: 55
-  DELETE 3
-  !PRINTLINE 3  # prints 3 (as literal after variable is deleted)
+DELETE RETURN
+# further RETURN statements error
 
-  DELETE RETURN
-  # any future RETURN statement will error
+DELETE +
+# '+' operator is now invalid
 
-  DELETE +
-  # '+' operator is now invalid everywhere
-
-  DELETE "hello"
-  # string literal "hello" cannot be used anymore
-
-  DELETE DELETE
-  # even the DELETE command itself can be deleted!
-  ```
+DELETE FN
+# you can no longer define new functions
+```
 
 ---
 
 ## Error Handling
 
-- Errors cause the program to immediately abort and print the error:
-  - Use of undefined or deleted tokens
-  - Divide-by-zero
-  - Bad syntax (mismatched parentheses, invalid expressions)
-  - Unknown function names
-  - Improper function definitions (e.g., missing `END`)
+Any error—undefined or deleted token, bad syntax, divide-by-zero, unknown function—  
+aborts execution with an error message.

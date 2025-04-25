@@ -1,3 +1,4 @@
 .vs
+.gitignore
 bin
 obj
