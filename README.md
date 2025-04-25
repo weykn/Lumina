@@ -10,6 +10,7 @@ Lumina is a lightweight, dynamic, and chaotic programming language featuring:
 - 🔥 Execution reversal (`REVERSE`) to flip program flow upward  
 - 🔥 Flexible string handling (quotes optional)  
 - 🔥 Number names (`one`, `two`, etc.) are built-in  
+- 🔥 Probability-based Booleans with fine-grained truthiness levels
 
 *Credits to [GulfOfMexico](https://github.com/TodePond/GulfOfMexico) for inspiring some ideas.*
 
@@ -108,7 +109,7 @@ x: 10
   3: 55
   $x!: 42
   ```
-  
+
 ### Lifetimes
 - Variables can **expire** automatically:
 
@@ -150,11 +151,117 @@ x: 10
 
 ---
 
-## 📏 Supported Literals and Types
+## 🔏 Supported Literals and Types
 
 - **Numbers**: `123`, `-7`, `3.14`
 - **Strings**: `"hello"`, `"""triple quoted"""`, `''''any number''''`
-- **Booleans**: `TRUE`, `FALSE`
+- **Booleans**:
+  - Traditional: `TRUE`, `FALSE`
+  - Fine-grained Probability Booleans:
+    - Full list:
+      ```text
+      100% TRUE
+      99% ALMOSTCERTAIN
+      98% EXTREMELYLIKELY
+      97% OVERWHELMINGLYLIKELY
+      96% HUGELYLIKELY
+      95% VERYSTRONGLYLIKELY
+      94% STRONGLYLIKELY
+      93% HIGHLYLIKELY
+      92% MOSTLYLIKELY
+      91% VERYLIKELY
+      90% LIKELY
+      89% PROBABLYLIKELY
+      88% QUITELIKELY
+      87% MOSTLYCERTAIN
+      86% GOODCHANCE
+      85% FAIRLYLIKELY
+      84% DECENTCHANCE
+      83% SOMEWHATLIKELY
+      82% SLIGHTLYLIKELY
+      81% BARELYLIKELY
+      80% PROBABLY
+      79% LEANSPOSITIVE
+      78% TENDSYES
+      77% LIKELYISH
+      76% SMALLYES
+      75% PROBABLYYEAH
+      74% SMALLPROBABLY
+      73% EDGEPOSITIVE
+      72% JUSTLIKELY
+      71% MAYBEYES
+      70% SOMEWHATYES
+      69% SLIGHTLYYES
+      68% BARELYYES
+      67% LEANINGYES
+      66% EDGEOFYES
+      65% THINYES
+      64% SHAKYYES
+      63% TILTYES
+      62% PROBABLYYES
+      61% CLOSETOYES
+      60% EDGELIKELY
+      59% MOSTLYMAYBE
+      58% STRONGMAYBE
+      57% WEAKYES
+      56% ALMOSTMAYBE
+      55% BARELYLIKELY
+      54% SLIGHTLYMORELIKELY
+      53% EDGEMORELIKELY
+      52% FAINTLIKELY
+      51% LEANSLIKELY
+      50% MAYBE
+      49% LEANSUNLIKELY
+      48% FAINTUNLIKELY
+      47% EDGEMOREUNLIKELY
+      46% SLIGHTLYMOREUNLIKELY
+      45% BARELYUNLIKELY
+      44% ALMOSTUNLIKELY
+      43% WEAKNO
+      42% STRONGMAYBENO
+      41% MOSTLYNO
+      40% EDGEOFUNLIKELY
+      39% CLOSETONO
+      38% PROBABLYNOT
+      37% TILTNO
+      36% SHAKYNO
+      35% THINNO
+      34% EDGENO
+      33% LEANINGNO
+      32% BARELYNO
+      31% SLIGHTLYNO
+      30% SOMEWHATNO
+      29% MAYBENO
+      28% JUSTNO
+      27% EDGENEGATIVE
+      26% SMALLNO
+      25% PROBABLYNOT
+      24% SMALLPROBABLYNOT
+      23% LIKELYNOT
+      22% TENDSMOSTLYNO
+      21% LEANSNEGATIVE
+      20% UNLIKELY
+      19% QUITEUNLIKELY
+      18% MOSTLYNOT
+      17% FAIRLYUNLIKELY
+      16% GOODCHANCENO
+      15% VERYUNLIKELY
+      14% DECENTCHANCENO
+      13% MOSTLYCERTAINNO
+      12% HIGHLYUNLIKELY
+      11% STRONGLYUNLIKELY
+      10% EXTREMELYUNLIKELY
+      9% OVERWHELMINGLYUNLIKELY
+      8% HUGELYUNLIKELY
+      7% VERYSTRONGLYUNLIKELY
+      6% ALMOSTCERTAINLYNOT
+      5% VIRTUALLYIMPOSSIBLE
+      4% NEARCERTAINNOT
+      3% ALMOSTIMPOSSIBLE
+      2% PRACTICALLYIMPOSSIBLE
+      1% IMPOSSIBLE
+      0% FALSE
+      ```
 - **Number names** (automatic mappings):
   ```text
   one   → 1
@@ -165,7 +272,7 @@ x: 10
   **Example**:
   ```text
   !PRINTLINE one       # prints 1
-  !PRINTLINE two+two   # prints 4
+  !PRINTLINE ten+two   # prints 12
   ```
 
 ---
@@ -216,7 +323,7 @@ REVERSE
 
 ---
 
-## 🚫 Deleting Tokens
+## ❌ Deleting Tokens
 
 - `DELETE <token>`  
   - If a **variable**, deletes only that instance.
@@ -258,3 +365,4 @@ DELETE DELETE
 ## ❗ Error Handling
 
 - Any error — undefined token, deleted keyword, bad syntax, math errors — **instantly aborts** execution with an error message.
+

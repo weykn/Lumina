@@ -57,7 +57,7 @@ namespace LuminaInterpreter
         public bool Reverse = false;
         public Value LastReturn = Value.FromNumber(0);
 
-        public int CurrentLine = 0;  // 1-based lines of execution
+        public int CurrentLine = 0;
         public Dictionary<string, int> LineExpirations = new(StringComparer.OrdinalIgnoreCase);
         public List<(string Var, DateTime Expire)> TimeExpirations = new();
 
@@ -92,13 +92,10 @@ namespace LuminaInterpreter
                 return;
             }
             foreach (var asm in ImportedAssemblies)
-            {
                 foreach (var type in asm.GetTypes())
                 {
-                    var m = type.GetMethod(name,
-                        BindingFlags.Public | BindingFlags.Static);
+                    var m = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static);
                     if (m == null) continue;
-
                     object raw;
                     var ps = m.GetParameters();
                     if (ps.Length == 1 && ps[0].ParameterType == typeof(Context))
@@ -119,7 +116,6 @@ namespace LuminaInterpreter
                     };
                     return;
                 }
-            }
             throw new Exception($"Unknown function: {name}");
         }
 
@@ -128,18 +124,17 @@ namespace LuminaInterpreter
 
         public void ExpireLifetimes()
         {
-            // Line‐based expirations
-            var expired = LineExpirations
+            var expiredLines = LineExpirations
                 .Where(kv => kv.Value <= CurrentLine)
                 .Select(kv => kv.Key)
                 .ToList();
-            foreach (var v in expired)
+            foreach (var v in expiredLines)
             {
                 CurrentFrame.Variables.Remove(v);
                 Function.Definitions.Remove(v);
                 LineExpirations.Remove(v);
             }
-            // Time‐based expirations
+
             var now = DateTime.Now;
             for (int i = TimeExpirations.Count - 1; i >= 0; i--)
             {
@@ -175,11 +170,13 @@ namespace LuminaInterpreter
 
     static class ExpressionParser
     {
+        // Precedence for infix operators
         static readonly Dictionary<string, int> Prec = new(StringComparer.Ordinal)
         {
             { "+",1 },{ "-",1 },{ "*",2 },{ "/",2 },{ "%",2 }
         };
 
+        // Number words
         static readonly Dictionary<string, double> NumberWords = new(StringComparer.OrdinalIgnoreCase)
         {
             ["zero"] = 0,
@@ -193,6 +190,111 @@ namespace LuminaInterpreter
             ["eight"] = 8,
             ["nine"] = 9,
             ["ten"] = 10
+        };
+
+        // Probabilistic boolean terms
+        static readonly Random _rand = new();
+        static readonly Dictionary<string, double> Probabilities = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["TRUE"] = 1.00,
+            ["ALMOSTCERTAIN"] = 0.99,
+            ["EXTREMELYLIKELY"] = 0.98,
+            ["OVERWHELMINGLYLIKELY"] = 0.97,
+            ["HUGELYLIKELY"] = 0.96,
+            ["VERYSTRONGLYLIKELY"] = 0.95,
+            ["STRONGLYLIKELY"] = 0.94,
+            ["HIGHLYLIKELY"] = 0.93,
+            ["MOSTLYLIKELY"] = 0.92,
+            ["VERYLIKELY"] = 0.91,
+            ["LIKELY"] = 0.90,
+            ["PROBABLYLIKELY"] = 0.89,
+            ["QUITELIKELY"] = 0.88,
+            ["MOSTLYCERTAIN"] = 0.87,
+            ["GOODCHANCE"] = 0.86,
+            ["FAIRLYLIKELY"] = 0.85,
+            ["DECENTCHANCE"] = 0.84,
+            ["SOMEWHATLIKELY"] = 0.83,
+            ["SLIGHTLYLIKELY"] = 0.82,
+            ["BARELYLIKELY"] = 0.81,
+            ["PROBABLY"] = 0.80,
+            ["LEANSPOSITIVE"] = 0.79,
+            ["TENDSYES"] = 0.78,
+            ["LIKELYISH"] = 0.77,
+            ["SMALLYES"] = 0.76,
+            ["PROBABLYYEAH"] = 0.75,
+            ["SMALLPROBABLY"] = 0.74,
+            ["EDGEPOSITIVE"] = 0.73,
+            ["JUSTLIKELY"] = 0.72,
+            ["MAYBEYES"] = 0.71,
+            ["SOMEWHATYES"] = 0.70,
+            ["SLIGHTLYYES"] = 0.69,
+            ["BARELYYES"] = 0.68,
+            ["LEANINGYES"] = 0.67,
+            ["EDGEOFYES"] = 0.66,
+            ["THINYES"] = 0.65,
+            ["SHAKYYES"] = 0.64,
+            ["TILTYES"] = 0.63,
+            ["PROBABLYYES"] = 0.62,
+            ["CLOSETOYES"] = 0.61,
+            ["EDGELIKELY"] = 0.60,
+            ["MOSTLYMAYBE"] = 0.59,
+            ["STRONGMAYBE"] = 0.58,
+            ["WEAKYES"] = 0.57,
+            ["ALMOSTMAYBE"] = 0.56,
+            ["SLIGHTLYMORELIKELY"] = 0.54,
+            ["EDGEMORELIKELY"] = 0.53,
+            ["FAINTLIKELY"] = 0.52,
+            ["LEANSLIKELY"] = 0.51,
+            ["MAYBE"] = 0.50,
+            ["LEANSUNLIKELY"] = 0.49,
+            ["FAINTUNLIKELY"] = 0.48,
+            ["EDGEMOREUNLIKELY"] = 0.47,
+            ["SLIGHTLYMOREUNLIKELY"] = 0.46,
+            ["BARELYUNLIKELY"] = 0.45,
+            ["ALMOSTUNLIKELY"] = 0.44,
+            ["WEAKNO"] = 0.43,
+            ["STRONGMAYBENO"] = 0.42,
+            ["MOSTLYNO"] = 0.41,
+            ["EDGEOFUNLIKELY"] = 0.40,
+            ["CLOSETONO"] = 0.39,
+            ["PROBABLYNOT"] = 0.38,
+            ["TILTNO"] = 0.37,
+            ["SHAKYNO"] = 0.36,
+            ["THINNO"] = 0.35,
+            ["EDGENO"] = 0.34,
+            ["LEANINGNO"] = 0.33,
+            ["BARELYNO"] = 0.32,
+            ["SLIGHTLYNO"] = 0.31,
+            ["SOMEWHATNO"] = 0.30,
+            ["MAYBENO"] = 0.29,
+            ["JUSTNO"] = 0.28,
+            ["EDGENEGATIVE"] = 0.27,
+            ["SMALLNO"] = 0.26,
+            ["SMALLPROBABLYNOT"] = 0.24,
+            ["LIKELYNOT"] = 0.23,
+            ["TENDSMOSTLYNO"] = 0.22,
+            ["LEANSNEGATIVE"] = 0.21,
+            ["UNLIKELY"] = 0.20,
+            ["QUITEUNLIKELY"] = 0.19,
+            ["MOSTLYNOT"] = 0.18,
+            ["FAIRLYUNLIKELY"] = 0.17,
+            ["GOODCHANCENO"] = 0.16,
+            ["VERYUNLIKELY"] = 0.15,
+            ["DECENTCHANCENO"] = 0.14,
+            ["MOSTLYCERTAINNO"] = 0.13,
+            ["HIGHLYUNLIKELY"] = 0.12,
+            ["STRONGLYUNLIKELY"] = 0.11,
+            ["EXTREMELYUNLIKELY"] = 0.10,
+            ["OVERWHELMINGLYUNLIKELY"] = 0.09,
+            ["HUGELYUNLIKELY"] = 0.08,
+            ["VERYSTRONGLYUNLIKELY"] = 0.07,
+            ["ALMOSTCERTAINLYNOT"] = 0.06,
+            ["VIRTUALLYIMPOSSIBLE"] = 0.05,
+            ["NEARCERTAINNOT"] = 0.04,
+            ["ALMOSTIMPOSSIBLE"] = 0.03,
+            ["PRACTICALLYIMPOSSIBLE"] = 0.02,
+            ["IMPOSSIBLE"] = 0.01,
+            ["FALSE"] = 0.0
         };
 
         public static List<string> TokenizeExpression(string expr)
@@ -222,7 +324,8 @@ namespace LuminaInterpreter
                 else
                 {
                     int j = i;
-                    while (j < expr.Length && "+-*/%()\"'\t\r\n ".IndexOf(expr[j]) < 0)
+                    while (j < expr.Length &&
+                        "+-*/%()\"'\t\r\n ".IndexOf(expr[j]) < 0)
                         j++;
                     tokens.Add(expr.Substring(i, j - i));
                     i = j;
@@ -272,8 +375,7 @@ namespace LuminaInterpreter
                     if (ctx.DisabledTokens.Contains(tok))
                         throw new Exception($"Unknown token: {tok}");
                     if (st.Count < 2) throw new Exception("Bad expression");
-                    var b = st.Pop();
-                    var a = st.Pop();
+                    var b = st.Pop(); var a = st.Pop();
                     var res = tok switch
                     {
                         "+" when a.Type == ValueType.Number && b.Type == ValueType.Number
@@ -334,12 +436,19 @@ namespace LuminaInterpreter
             if (ctx.DisabledTokens.Contains(tok))
                 throw new Exception($"Unknown token: {tok}");
 
+            // 1) variable
             if (ctx.CurrentFrame.Variables.TryGetValue(tok, out var v))
                 return v;
 
+            // 2) probabilistic boolean term?
+            if (Probabilities.TryGetValue(tok, out var p))
+                return Value.FromBoolean(_rand.NextDouble() < p);
+
+            // 3) number-word
             if (NumberWords.TryGetValue(tok, out var wn))
                 return Value.FromNumber(wn);
 
+            // 4) quoted literal
             if (tok.Length >= 2 && (tok[0] == '"' || tok[0] == '\'') && tok[0] == tok[^1])
             {
                 string s = tok;
@@ -348,14 +457,11 @@ namespace LuminaInterpreter
                 return Value.FromString(s);
             }
 
-            if (tok.Equals("TRUE", StringComparison.OrdinalIgnoreCase))
-                return Value.FromBoolean(true);
-            if (tok.Equals("FALSE", StringComparison.OrdinalIgnoreCase))
-                return Value.FromBoolean(false);
-
+            // 5) numeric literal (float)
             if (double.TryParse(tok, out var d))
                 return Value.FromNumber(d);
 
+            // 6) fallback bare → string
             return Value.FromString(tok);
         }
     }
@@ -381,7 +487,7 @@ namespace LuminaInterpreter
             if (ctx.DisabledTokens.Contains(Keyword))
                 throw new Exception($"Unknown statement: {Keyword}");
             ExecuteImpl(ctx);
-            // After each statement, advance line & expire lifetimes
+            // After each statement, advance & expire
             ctx.CurrentLine++;
             ctx.ExpireLifetimes();
         }
@@ -421,15 +527,12 @@ namespace LuminaInterpreter
         { Var = v; Expr = e; LineLifetime = ll; TimeLifetime = tl; }
         protected override void ExecuteImpl(Context ctx)
         {
-            // Standard assignment
             var val = ExpressionParser.EvaluateExpression(ctx, Expr);
             ctx.CurrentFrame.Variables[Var] = val;
-
-            // Schedule expiration:
             if (LineLifetime > 0)
                 ctx.LineExpirations[Var] = ctx.CurrentLine + LineLifetime;
             else if (LineLifetime < 0)
-                ctx.LineExpirations[Var] = ctx.CurrentLine;   // expire right on definition
+                ctx.LineExpirations[Var] = ctx.CurrentLine;
             if (TimeLifetime > 0)
                 ctx.TimeExpirations.Add((Var, DateTime.Now.AddSeconds(TimeLifetime)));
         }
@@ -566,17 +669,12 @@ namespace LuminaInterpreter
 
         public void Parse()
         {
-            var rawLines = Lines;
-            while (Index < rawLines.Length)
+            while (Index < Lines.Length)
             {
-                var raw = rawLines[Index++];
+                var raw = Lines[Index++];
                 var ln = raw.Trim();
-                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
-                    continue;
-                var parts = TokenRx.Matches(ln)
-                                  .Cast<Match>()
-                                  .Select(m => m.Value)
-                                  .ToList();
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
+                var parts = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
                 Statement stmt;
                 if (parts[0].Equals("IMPORT", StringComparison.OrdinalIgnoreCase))
                     stmt = new ImportStmt(parts[1].Trim('"', '\''));
@@ -590,7 +688,6 @@ namespace LuminaInterpreter
                     stmt = ParseLifetimeAssign(parts);
                 else
                     stmt = ParseSimpleStmt(parts);
-
                 TopLevel.Add(stmt);
             }
         }
@@ -602,10 +699,8 @@ namespace LuminaInterpreter
             {
                 var raw = Lines[Index++];
                 var ln = raw.Trim();
-                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
-                    continue;
-                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
-                    break;
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
                 var p = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
                 body.Add(ParseSimpleOrBlock(p));
             }
@@ -630,10 +725,8 @@ namespace LuminaInterpreter
             {
                 var raw = Lines[Index++];
                 var ln = raw.Trim();
-                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
-                    continue;
-                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
-                    break;
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
                 var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
                 body.Add(ParseSimpleOrBlock(q));
             }
@@ -648,10 +741,8 @@ namespace LuminaInterpreter
             {
                 var raw = Lines[Index++];
                 var ln = raw.Trim();
-                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
-                    continue;
-                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
-                    break;
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
                 var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
                 body.Add(ParseSimpleOrBlock(q));
             }
@@ -665,10 +756,8 @@ namespace LuminaInterpreter
             {
                 var raw = Lines[Index++];
                 var ln = raw.Trim();
-                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
-                    continue;
-                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
-                    break;
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
                 var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
                 body.Add(ParseSimpleOrBlock(q));
             }
@@ -683,10 +772,8 @@ namespace LuminaInterpreter
             {
                 var raw = Lines[Index++];
                 var ln = raw.Trim();
-                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
-                    continue;
-                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
-                    break;
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
                 var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
                 body.Add(ParseSimpleOrBlock(q));
             }
@@ -695,7 +782,8 @@ namespace LuminaInterpreter
 
         (string left, string op, string right) SplitCondition(List<string> p)
         {
-            var comps = new[] { "<=", ">=", "==", "!=", "<", ">", "LESS", "GREATER", "LESSEQ", "GREATEREQ", "EQUAL", "NOTEQUAL" };
+            var comps = new[]{ "<=",">=","==","!=","<",">","LESS","GREATER",
+                "LESSEQ","GREATEREQ","EQUAL","NOTEQUAL" };
             int idx = p.FindIndex(1, x => comps.Contains(x.ToUpperInvariant()));
             if (idx < 0) throw new Exception("Invalid IF/WHILE condition");
             string left = string.Join(" ", p.Skip(1).Take(idx - 1));
@@ -766,23 +854,6 @@ namespace LuminaInterpreter
             var parser = new Parser(lines);
             parser.Parse();
 
-            // Build retroactive negative‐lifetime definitions
-            var syntheticDefs = new Dictionary<int, List<(string Var, string Expr)>>();
-            for (int i = 0; i < parser.TopLevel.Count; i++)
-            {
-                if (parser.TopLevel[i] is AssignWithLifetimeStmt aws && aws.LineLifetime < 0)
-                {
-                    int defLine = i + 1;                          // 1-based
-                    int start = Math.Max(1, defLine + aws.LineLifetime);
-                    for (int L = start; L < defLine; L++)
-                    {
-                        if (!syntheticDefs.ContainsKey(L))
-                            syntheticDefs[L] = new List<(string, string)>();
-                        syntheticDefs[L].Add((aws.Var, aws.Expr));
-                    }
-                }
-            }
-
             var ctx = new Context();
             ctx.CallStack.Push(new Frame());
             foreach (var imp in parser.Imports)
@@ -791,24 +862,8 @@ namespace LuminaInterpreter
             int ip = ctx.Reverse ? parser.TopLevel.Count - 1 : 0;
             while (ip >= 0 && ip < parser.TopLevel.Count)
             {
-                // Retroactive definitions for negative lifetimes:
-                int nextLine = ctx.CurrentLine + 1;
-                if (syntheticDefs.TryGetValue(nextLine, out var defs))
-                {
-                    foreach (var (v, e) in defs)
-                        ctx.CurrentFrame.Variables[v]
-                          = ExpressionParser.EvaluateExpression(ctx, e);
-                }
-
-                try
-                {
-                    parser.TopLevel[ip].Execute(ctx);
-                }
-                catch (ReturnException)
-                {
-                    break;
-                }
-
+                try { parser.TopLevel[ip].Execute(ctx); }
+                catch (ReturnException) { break; }
                 ip += ctx.Reverse ? -1 : 1;
             }
 
