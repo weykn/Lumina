@@ -12,42 +12,54 @@ namespace LuminaInterpreter
     public struct Value
     {
         public ValueType Type;
-        public long Number;
+        public double Number;
         public string Str;
         public bool Bool;
 
-        public static Value FromNumber(long n) => new Value { Type = ValueType.Number, Number = n };
-        public static Value FromString(string s) => new Value { Type = ValueType.String, Str = s };
-        public static Value FromBoolean(bool b) => new Value { Type = ValueType.Boolean, Bool = b };
+        public static Value FromNumber(double n) => new() { Type = ValueType.Number, Number = n };
+        public static Value FromString(string s) => new() { Type = ValueType.String, Str = s };
+        public static Value FromBoolean(bool b) => new() { Type = ValueType.Boolean, Bool = b };
 
         public override string ToString() => Type switch
         {
-            ValueType.Number => Number.ToString(),
+            ValueType.Number => Number.ToString("G"),
             ValueType.String => Str,
             ValueType.Boolean => Bool.ToString().ToLower(),
             _ => ""
         };
 
-        public int CompareTo(Value other)
+        public int CompareTo(Value o) => Type switch
         {
-            if (Type == ValueType.Number && other.Type == ValueType.Number)
-                return Number.CompareTo(other.Number);
-            if (Type == ValueType.String && other.Type == ValueType.String)
-                return string.Compare(Str, other.Str, StringComparison.Ordinal);
-            if (Type == ValueType.Boolean && other.Type == ValueType.Boolean)
-                return Bool.CompareTo(other.Bool);
-            throw new Exception($"Cannot compare {Type} with {other.Type}");
-        }
+            ValueType.Number when o.Type == ValueType.Number => Number.CompareTo(o.Number),
+            ValueType.String when o.Type == ValueType.String => string.Compare(Str, o.Str, StringComparison.Ordinal),
+            ValueType.Boolean when o.Type == ValueType.Boolean => Bool.CompareTo(o.Bool),
+            _ => throw new Exception($"Cannot compare {Type} with {o.Type}")
+        };
+    }
+
+    public static class Utils
+    {
+        public static bool IsTruthy(Value v) => v.Type switch
+        {
+            ValueType.Boolean => v.Bool,
+            ValueType.Number => v.Number != 0,
+            ValueType.String => v.Str.Length > 0,
+            _ => false
+        };
     }
 
     public class Context
     {
-        public Stack<Value> ArgStack = new Stack<Value>();
-        public Stack<Frame> CallStack = new Stack<Frame>();
-        public List<Assembly> ImportedAssemblies = new List<Assembly>();
-        public HashSet<string> DisabledTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public Stack<Value> ArgStack = new();
+        public Stack<Frame> CallStack = new();
+        public List<Assembly> ImportedAssemblies = new();
+        public HashSet<string> DisabledTokens = new(StringComparer.OrdinalIgnoreCase);
         public bool Reverse = false;
         public Value LastReturn = Value.FromNumber(0);
+
+        public int CurrentLine = 0;  // 1-based lines of execution
+        public Dictionary<string, int> LineExpirations = new(StringComparer.OrdinalIgnoreCase);
+        public List<(string Var, DateTime Expire)> TimeExpirations = new();
 
         public Frame CurrentFrame => CallStack.Peek();
 
@@ -71,7 +83,7 @@ namespace LuminaInterpreter
 
             if (BuiltIns.Map.TryGetValue(name, out var bi))
             {
-                LastReturn = bi(this, new List<Value>());
+                LastReturn = bi(this, new());
                 return;
             }
             if (Function.Definitions.TryGetValue(name, out var fn))
@@ -83,7 +95,8 @@ namespace LuminaInterpreter
             {
                 foreach (var type in asm.GetTypes())
                 {
-                    var m = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static);
+                    var m = type.GetMethod(name,
+                        BindingFlags.Public | BindingFlags.Static);
                     if (m == null) continue;
 
                     object raw;
@@ -100,7 +113,7 @@ namespace LuminaInterpreter
                         Type t when t == typeof(void) => Value.FromNumber(0),
                         Type t when t == typeof(string) => Value.FromString((string)raw),
                         Type t when t == typeof(bool) => Value.FromBoolean((bool)raw),
-                        Type t when t.IsPrimitive => Value.FromNumber(Convert.ToInt64(raw)),
+                        Type t when t.IsPrimitive => Value.FromNumber(Convert.ToDouble(raw)),
                         Type t when t == typeof(Value) => (Value)raw,
                         _ => throw new Exception($"Unsupported return type {m.ReturnType}")
                     };
@@ -111,28 +124,50 @@ namespace LuminaInterpreter
         }
 
         public void LoadAssembly(string path)
+            => ImportedAssemblies.Add(Assembly.LoadFrom(path));
+
+        public void ExpireLifetimes()
         {
-            var asm = Assembly.LoadFrom(path);
-            ImportedAssemblies.Add(asm);
+            // Line‐based expirations
+            var expired = LineExpirations
+                .Where(kv => kv.Value <= CurrentLine)
+                .Select(kv => kv.Key)
+                .ToList();
+            foreach (var v in expired)
+            {
+                CurrentFrame.Variables.Remove(v);
+                Function.Definitions.Remove(v);
+                LineExpirations.Remove(v);
+            }
+            // Time‐based expirations
+            var now = DateTime.Now;
+            for (int i = TimeExpirations.Count - 1; i >= 0; i--)
+            {
+                if (TimeExpirations[i].Expire <= now)
+                {
+                    var v = TimeExpirations[i].Var;
+                    CurrentFrame.Variables.Remove(v);
+                    Function.Definitions.Remove(v);
+                    TimeExpirations.RemoveAt(i);
+                }
+            }
         }
     }
 
     public class Frame
     {
-        public Dictionary<string, Value> Variables = new Dictionary<string, Value>();
+        public Dictionary<string, Value> Variables = new(StringComparer.OrdinalIgnoreCase);
         public Value Lookup(string name)
-        {
-            if (!Variables.TryGetValue(name, out var v))
-                throw new Exception($"Undefined variable or literal: {name}");
-            return v;
-        }
+            => Variables.TryGetValue(name, out var v)
+               ? v
+               : throw new Exception($"Undefined variable or literal: {name}");
     }
 
     public class Function
     {
         public string Name;
-        public List<Statement> Body = new List<Statement>();
-        public static Dictionary<string, Function> Definitions = new Dictionary<string, Function>();
+        public List<Statement> Body = new();
+        public static Dictionary<string, Function> Definitions = new();
         public Function(string name) { Name = name; }
     }
 
@@ -145,6 +180,21 @@ namespace LuminaInterpreter
             { "+",1 },{ "-",1 },{ "*",2 },{ "/",2 },{ "%",2 }
         };
 
+        static readonly Dictionary<string, double> NumberWords = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["zero"] = 0,
+            ["one"] = 1,
+            ["two"] = 2,
+            ["three"] = 3,
+            ["four"] = 4,
+            ["five"] = 5,
+            ["six"] = 6,
+            ["seven"] = 7,
+            ["eight"] = 8,
+            ["nine"] = 9,
+            ["ten"] = 10
+        };
+
         public static List<string> TokenizeExpression(string expr)
         {
             var tokens = new List<string>();
@@ -153,12 +203,16 @@ namespace LuminaInterpreter
             {
                 char c = expr[i];
                 if (char.IsWhiteSpace(c)) { i++; continue; }
-                if (c == '"')
+
+                if (c == '"' || c == '\'')
                 {
-                    int j = expr.IndexOf('"', i + 1);
+                    char q = c; int qlen = 1;
+                    while (i + qlen < expr.Length && expr[i + qlen] == q) qlen++;
+                    string delim = new string(q, qlen);
+                    int j = expr.IndexOf(delim, i + qlen, StringComparison.Ordinal);
                     if (j < 0) throw new Exception("Unterminated string literal");
-                    tokens.Add(expr.Substring(i, j - i + 1));
-                    i = j + 1;
+                    tokens.Add(expr.Substring(i, j + qlen - i));
+                    i = j + qlen;
                 }
                 else if ("+-*/%()".IndexOf(c) >= 0)
                 {
@@ -168,7 +222,7 @@ namespace LuminaInterpreter
                 else
                 {
                     int j = i;
-                    while (j < expr.Length && "+-*/%()\" \t\r\n".IndexOf(expr[j]) < 0)
+                    while (j < expr.Length && "+-*/%()\"'\t\r\n ".IndexOf(expr[j]) < 0)
                         j++;
                     tokens.Add(expr.Substring(i, j - i));
                     i = j;
@@ -255,21 +309,54 @@ namespace LuminaInterpreter
             return EvalRPN(ctx, ToRPN(toks));
         }
 
+        public static bool EvaluateCondition(Value a, Value b, string op)
+        {
+            return op.ToUpperInvariant() switch
+            {
+                "<" => a.CompareTo(b) < 0,
+                "LESS" => a.CompareTo(b) < 0,
+                ">" => a.CompareTo(b) > 0,
+                "GREATER" => a.CompareTo(b) > 0,
+                "<=" => a.CompareTo(b) <= 0,
+                "LESSEQ" => a.CompareTo(b) <= 0,
+                ">=" => a.CompareTo(b) >= 0,
+                "GREATEREQ" => a.CompareTo(b) >= 0,
+                "==" => a.CompareTo(b) == 0,
+                "EQUAL" => a.CompareTo(b) == 0,
+                "!=" => a.CompareTo(b) != 0,
+                "NOTEQUAL" => a.CompareTo(b) != 0,
+                _ => throw new Exception($"Unknown comparator: {op}")
+            };
+        }
+
         static Value EvaluateAtom(Context ctx, string tok)
         {
             if (ctx.DisabledTokens.Contains(tok))
                 throw new Exception($"Unknown token: {tok}");
+
             if (ctx.CurrentFrame.Variables.TryGetValue(tok, out var v))
                 return v;
-            if (tok.StartsWith("\"") && tok.EndsWith("\"") && tok.Length >= 2)
-                return Value.FromString(tok[1..^1]);
+
+            if (NumberWords.TryGetValue(tok, out var wn))
+                return Value.FromNumber(wn);
+
+            if (tok.Length >= 2 && (tok[0] == '"' || tok[0] == '\'') && tok[0] == tok[^1])
+            {
+                string s = tok;
+                while (s.Length >= 2 && (s[0] == '"' || s[0] == '\'') && s[0] == s[^1])
+                    s = s[1..^1];
+                return Value.FromString(s);
+            }
+
             if (tok.Equals("TRUE", StringComparison.OrdinalIgnoreCase))
                 return Value.FromBoolean(true);
             if (tok.Equals("FALSE", StringComparison.OrdinalIgnoreCase))
                 return Value.FromBoolean(false);
-            if (long.TryParse(tok, out var n))
-                return Value.FromNumber(n);
-            throw new Exception($"Undefined token: {tok}");
+
+            if (double.TryParse(tok, out var d))
+                return Value.FromNumber(d);
+
+            return Value.FromString(tok);
         }
     }
 
@@ -294,6 +381,9 @@ namespace LuminaInterpreter
             if (ctx.DisabledTokens.Contains(Keyword))
                 throw new Exception($"Unknown statement: {Keyword}");
             ExecuteImpl(ctx);
+            // After each statement, advance line & expire lifetimes
+            ctx.CurrentLine++;
+            ctx.ExpireLifetimes();
         }
         protected abstract void ExecuteImpl(Context ctx);
     }
@@ -303,10 +393,7 @@ namespace LuminaInterpreter
         public override string Keyword => "IMPORT";
         string Path;
         public ImportStmt(string path) { Path = path; }
-        protected override void ExecuteImpl(Context ctx)
-        {
-            ctx.LoadAssembly(Path);
-        }
+        protected override void ExecuteImpl(Context ctx) => ctx.LoadAssembly(Path);
     }
 
     public class FunctionDefStmt : Statement
@@ -314,12 +401,8 @@ namespace LuminaInterpreter
         public override string Keyword => FnKeyword;
         string FnKeyword, Name;
         List<Statement> Body;
-        public FunctionDefStmt(string fnKeyword, string name, List<Statement> body)
-        {
-            FnKeyword = fnKeyword;
-            Name = name;
-            Body = body;
-        }
+        public FunctionDefStmt(string fk, string name, List<Statement> b)
+        { FnKeyword = fk; Name = name; Body = b; }
         protected override void ExecuteImpl(Context ctx)
         {
             var f = new Function(Name);
@@ -328,11 +411,35 @@ namespace LuminaInterpreter
         }
     }
 
+    public class AssignWithLifetimeStmt : Statement
+    {
+        public override string Keyword => ":";
+        public string Var, Expr;
+        public int LineLifetime;
+        public double TimeLifetime;
+        public AssignWithLifetimeStmt(string v, int ll, double tl, string e)
+        { Var = v; Expr = e; LineLifetime = ll; TimeLifetime = tl; }
+        protected override void ExecuteImpl(Context ctx)
+        {
+            // Standard assignment
+            var val = ExpressionParser.EvaluateExpression(ctx, Expr);
+            ctx.CurrentFrame.Variables[Var] = val;
+
+            // Schedule expiration:
+            if (LineLifetime > 0)
+                ctx.LineExpirations[Var] = ctx.CurrentLine + LineLifetime;
+            else if (LineLifetime < 0)
+                ctx.LineExpirations[Var] = ctx.CurrentLine;   // expire right on definition
+            if (TimeLifetime > 0)
+                ctx.TimeExpirations.Add((Var, DateTime.Now.AddSeconds(TimeLifetime)));
+        }
+    }
+
     public class AssignExprStmt : Statement
     {
         public override string Keyword => ":";
         string Var, Expr;
-        public AssignExprStmt(string var, string expr) { Var = var; Expr = expr; }
+        public AssignExprStmt(string v, string e) { Var = v; Expr = e; }
         protected override void ExecuteImpl(Context ctx)
         {
             var val = ExpressionParser.EvaluateExpression(ctx, Expr);
@@ -343,14 +450,11 @@ namespace LuminaInterpreter
     public class InlineCallStmt : Statement
     {
         public override string Keyword => FuncName;
-        string FuncName;
-        List<string> Args;
-        public InlineCallStmt(string fn, List<string> args)
-        { FuncName = fn; Args = args; }
+        string FuncName; List<string> Args;
+        public InlineCallStmt(string fn, List<string> a) { FuncName = fn; Args = a; }
         protected override void ExecuteImpl(Context ctx)
         {
-            var vals = Args.Select(a => ExpressionParser.EvaluateExpression(ctx, a))
-                           .ToList();
+            var vals = Args.Select(x => ExpressionParser.EvaluateExpression(ctx, x)).ToList();
             if (BuiltIns.Map.TryGetValue(FuncName, out var bi))
             {
                 ctx.LastReturn = bi(ctx, vals);
@@ -365,7 +469,7 @@ namespace LuminaInterpreter
     {
         public override string Keyword => "DELETE";
         string Token;
-        public DeleteStmt(string tok) { Token = tok; }
+        public DeleteStmt(string t) { Token = t; }
         protected override void ExecuteImpl(Context ctx)
         {
             ctx.CurrentFrame.Variables.Remove(Token);
@@ -378,7 +482,7 @@ namespace LuminaInterpreter
     {
         public override string Keyword => "RETURN";
         string Expr;
-        public ReturnStmt(string expr) { Expr = expr; }
+        public ReturnStmt(string e) { Expr = e; }
         protected override void ExecuteImpl(Context ctx)
         {
             ctx.LastReturn = ExpressionParser.EvaluateExpression(ctx, Expr);
@@ -389,62 +493,228 @@ namespace LuminaInterpreter
     public class ReverseStmt : Statement
     {
         public override string Keyword => "REVERSE";
+        protected override void ExecuteImpl(Context ctx) => ctx.Reverse = !ctx.Reverse;
+    }
+
+    public class IfStmt : Statement
+    {
+        public override string Keyword => "IF";
+        string Left, Op, Right;
+        List<Statement> Body;
+        public IfStmt(string l, string op, string r, List<Statement> b)
+        { Left = l; Op = op; Right = r; Body = b; }
         protected override void ExecuteImpl(Context ctx)
         {
-            ctx.Reverse = !ctx.Reverse;
+            var a = ExpressionParser.EvaluateExpression(ctx, Left);
+            var b = ExpressionParser.EvaluateExpression(ctx, Right);
+            if (ExpressionParser.EvaluateCondition(a, b, Op))
+                foreach (var s in Body) s.Execute(ctx);
+        }
+    }
+
+    public class IfExprStmt : Statement
+    {
+        public override string Keyword => "IF";
+        string Cond; List<Statement> Body;
+        public IfExprStmt(string c, List<Statement> b) { Cond = c; Body = b; }
+        protected override void ExecuteImpl(Context ctx)
+        {
+            var v = ExpressionParser.EvaluateExpression(ctx, Cond);
+            if (Utils.IsTruthy(v))
+                foreach (var s in Body) s.Execute(ctx);
+        }
+    }
+
+    public class WhileStmt : Statement
+    {
+        public override string Keyword => "WHILE";
+        string Left, Op, Right;
+        List<Statement> Body;
+        public WhileStmt(string l, string op, string r, List<Statement> b)
+        { Left = l; Op = op; Right = r; Body = b; }
+        protected override void ExecuteImpl(Context ctx)
+        {
+            while (ExpressionParser.EvaluateCondition(
+                ExpressionParser.EvaluateExpression(ctx, Left),
+                ExpressionParser.EvaluateExpression(ctx, Right),
+                Op))
+                foreach (var s in Body) s.Execute(ctx);
+        }
+    }
+
+    public class WhileExprStmt : Statement
+    {
+        public override string Keyword => "WHILE";
+        string Cond; List<Statement> Body;
+        public WhileExprStmt(string c, List<Statement> b) { Cond = c; Body = b; }
+        protected override void ExecuteImpl(Context ctx)
+        {
+            while (Utils.IsTruthy(ExpressionParser.EvaluateExpression(ctx, Cond)))
+                foreach (var s in Body) s.Execute(ctx);
         }
     }
 
     public class Parser
     {
-        static readonly Regex TokenRx = new Regex("\"[^\"]*\"|[^\\s]+");
+        static readonly Regex TokenRx = new Regex("\"[^\"]*\"|'[^']*'|[^\\s]+");
         string[] Lines;
-        public List<Statement> TopLevel = new List<Statement>();
+        public List<Statement> TopLevel = new();
+        public List<string> Imports = new();
         int Index;
+
         public Parser(string[] lines) { Lines = lines; Index = 0; }
 
         public void Parse()
         {
-            while (Index < Lines.Length)
+            var rawLines = Lines;
+            while (Index < rawLines.Length)
             {
-                var ln = Lines[Index++].Trim();
-                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
+                var raw = rawLines[Index++];
+                var ln = raw.Trim();
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
+                    continue;
                 var parts = TokenRx.Matches(ln)
                                   .Cast<Match>()
                                   .Select(m => m.Value)
                                   .ToList();
                 Statement stmt;
                 if (parts[0].Equals("IMPORT", StringComparison.OrdinalIgnoreCase))
-                {
-                    stmt = new ImportStmt(parts[1].Trim('"'));
-                }
+                    stmt = new ImportStmt(parts[1].Trim('"', '\''));
                 else if (IsFnKeyword(parts[0]) && parts.Count == 2)
-                {
                     stmt = ParseFunctionDef(parts[0], parts[1]);
-                }
+                else if (parts[0].Equals("IF", StringComparison.OrdinalIgnoreCase))
+                    stmt = parts.Count == 2 ? ParseIfExpr(parts) : ParseIf(parts);
+                else if (parts[0].Equals("WHILE", StringComparison.OrdinalIgnoreCase))
+                    stmt = parts.Count == 2 ? ParseWhileExpr(parts) : ParseWhile(parts);
+                else if (parts.Count >= 3 && parts[1].EndsWith(":") && !parts[0].EndsWith(":"))
+                    stmt = ParseLifetimeAssign(parts);
                 else
-                {
                     stmt = ParseSimpleStmt(parts);
-                }
+
                 TopLevel.Add(stmt);
             }
         }
 
-        FunctionDefStmt ParseFunctionDef(string fnKw, string name)
+        FunctionDefStmt ParseFunctionDef(string fk, string name)
         {
             var body = new List<Statement>();
             while (Index < Lines.Length)
             {
-                var ln = Lines[Index++].Trim();
-                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
-                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
-                var parts = TokenRx.Matches(ln)
-                                  .Cast<Match>()
-                                  .Select(m => m.Value)
-                                  .ToList();
-                body.Add(ParseSimpleStmt(parts));
+                var raw = Lines[Index++];
+                var ln = raw.Trim();
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
+                    continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
+                    break;
+                var p = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
+                body.Add(ParseSimpleOrBlock(p));
             }
-            return new FunctionDefStmt(fnKw, name, body);
+            return new FunctionDefStmt(fk, name, body);
+        }
+
+        Statement ParseSimpleOrBlock(List<string> p)
+        {
+            if (p[0].Equals("IF", StringComparison.OrdinalIgnoreCase))
+                return p.Count == 2 ? ParseIfExpr(p) : ParseIf(p);
+            if (p[0].Equals("WHILE", StringComparison.OrdinalIgnoreCase))
+                return p.Count == 2 ? ParseWhileExpr(p) : ParseWhile(p);
+            if (p.Count >= 3 && p[1].EndsWith(":") && !p[0].EndsWith(":"))
+                return ParseLifetimeAssign(p);
+            return ParseSimpleStmt(p);
+        }
+
+        IfExprStmt ParseIfExpr(List<string> p)
+        {
+            var body = new List<Statement>();
+            while (Index < Lines.Length)
+            {
+                var raw = Lines[Index++];
+                var ln = raw.Trim();
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
+                    continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
+                    break;
+                var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
+                body.Add(ParseSimpleOrBlock(q));
+            }
+            return new IfExprStmt(p[1], body);
+        }
+
+        IfStmt ParseIf(List<string> p)
+        {
+            var (l, op, r) = SplitCondition(p);
+            var body = new List<Statement>();
+            while (Index < Lines.Length)
+            {
+                var raw = Lines[Index++];
+                var ln = raw.Trim();
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
+                    continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
+                    break;
+                var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
+                body.Add(ParseSimpleOrBlock(q));
+            }
+            return new IfStmt(l, op, r, body);
+        }
+
+        WhileExprStmt ParseWhileExpr(List<string> p)
+        {
+            var body = new List<Statement>();
+            while (Index < Lines.Length)
+            {
+                var raw = Lines[Index++];
+                var ln = raw.Trim();
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
+                    continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
+                    break;
+                var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
+                body.Add(ParseSimpleOrBlock(q));
+            }
+            return new WhileExprStmt(p[1], body);
+        }
+
+        WhileStmt ParseWhile(List<string> p)
+        {
+            var (l, op, r) = SplitCondition(p);
+            var body = new List<Statement>();
+            while (Index < Lines.Length)
+            {
+                var raw = Lines[Index++];
+                var ln = raw.Trim();
+                if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#"))
+                    continue;
+                if (ln.Equals("END", StringComparison.OrdinalIgnoreCase))
+                    break;
+                var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
+                body.Add(ParseSimpleOrBlock(q));
+            }
+            return new WhileStmt(l, op, r, body);
+        }
+
+        (string left, string op, string right) SplitCondition(List<string> p)
+        {
+            var comps = new[] { "<=", ">=", "==", "!=", "<", ">", "LESS", "GREATER", "LESSEQ", "GREATEREQ", "EQUAL", "NOTEQUAL" };
+            int idx = p.FindIndex(1, x => comps.Contains(x.ToUpperInvariant()));
+            if (idx < 0) throw new Exception("Invalid IF/WHILE condition");
+            string left = string.Join(" ", p.Skip(1).Take(idx - 1));
+            string op = p[idx];
+            string right = string.Join(" ", p.Skip(idx + 1));
+            return (left, op, right);
+        }
+
+        Statement ParseLifetimeAssign(List<string> p)
+        {
+            string var = p[0];
+            string life = p[1].TrimEnd(':');
+            string expr = string.Join(" ", p.Skip(2));
+            int lines = 0; double secs = 0;
+            if (life.EndsWith("s", StringComparison.OrdinalIgnoreCase))
+                secs = double.Parse(life[..^1]);
+            else
+                lines = int.Parse(life);
+            return new AssignWithLifetimeStmt(var, lines, secs, expr);
         }
 
         Statement ParseSimpleStmt(List<string> p)
@@ -462,16 +732,17 @@ namespace LuminaInterpreter
             throw new Exception($"Unknown statement: {p[0]}");
         }
 
-        static bool IsFnKeyword(string token)
+        static bool IsFnKeyword(string t)
         {
-            string t = token.ToUpperInvariant(), target = "FUNCTION";
+            var u = t.ToUpperInvariant();
+            const string target = "FUNCTION";
             int ti = 0, ki = 0;
-            while (ti < t.Length && ki < target.Length)
+            while (ti < u.Length && ki < target.Length)
             {
-                if (t[ti] == target[ki]) ti++;
+                if (u[ti] == target[ki]) ti++;
                 ki++;
             }
-            return ti == t.Length && ti > 0;
+            return ti == u.Length && ti > 0;
         }
     }
 
@@ -495,12 +766,40 @@ namespace LuminaInterpreter
             var parser = new Parser(lines);
             parser.Parse();
 
+            // Build retroactive negative‐lifetime definitions
+            var syntheticDefs = new Dictionary<int, List<(string Var, string Expr)>>();
+            for (int i = 0; i < parser.TopLevel.Count; i++)
+            {
+                if (parser.TopLevel[i] is AssignWithLifetimeStmt aws && aws.LineLifetime < 0)
+                {
+                    int defLine = i + 1;                          // 1-based
+                    int start = Math.Max(1, defLine + aws.LineLifetime);
+                    for (int L = start; L < defLine; L++)
+                    {
+                        if (!syntheticDefs.ContainsKey(L))
+                            syntheticDefs[L] = new List<(string, string)>();
+                        syntheticDefs[L].Add((aws.Var, aws.Expr));
+                    }
+                }
+            }
+
             var ctx = new Context();
             ctx.CallStack.Push(new Frame());
+            foreach (var imp in parser.Imports)
+                ctx.LoadAssembly(imp);
 
             int ip = ctx.Reverse ? parser.TopLevel.Count - 1 : 0;
             while (ip >= 0 && ip < parser.TopLevel.Count)
             {
+                // Retroactive definitions for negative lifetimes:
+                int nextLine = ctx.CurrentLine + 1;
+                if (syntheticDefs.TryGetValue(nextLine, out var defs))
+                {
+                    foreach (var (v, e) in defs)
+                        ctx.CurrentFrame.Variables[v]
+                          = ExpressionParser.EvaluateExpression(ctx, e);
+                }
+
                 try
                 {
                     parser.TopLevel[ip].Execute(ctx);
@@ -509,6 +808,7 @@ namespace LuminaInterpreter
                 {
                     break;
                 }
+
                 ip += ctx.Reverse ? -1 : 1;
             }
 

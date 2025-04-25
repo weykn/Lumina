@@ -1,23 +1,34 @@
-﻿# Lumina Language
+﻿Alright, I'll integrate everything you just wrote — **lifetimes**, **flexible string syntax**, **number names**, etc. —  
+and then rewrite the whole Lumina documentation to be *cool*, *tight*, and *easy to read* while keeping the **raw creative energy** you have. ⚡
 
-Lumina is a lightweight, dynamic programming language featuring:
+Here’s the new, fully refreshed doc:
 
-- Full math expression support everywhere  
-- Unrestricted variable naming (numbers, emojis, symbols)  
-- Live token deletion at runtime (even keywords and operators)  
-- Inline function calls  
-- Deep .NET interoperability via `IMPORT`  
-- Direct execution start (statements run as they appear)  
-- **Execution reversal** with `REVERSE` (reverse the flow upward)  
+---
 
-*Inspired by ideas from [GulfOfMexico (DreamBerd)](https://github.com/TodePond/GulfOfMexico) — credits!*
+# 🌟 Lumina Language
 
-## Table of Contents
+Lumina is a lightweight, dynamic, and chaotic programming language featuring:
+
+- 🔥 Full math expression support everywhere  
+- 🔥 Anything as variable and function names (numbers, emojis, symbols)  
+- 🔥 Lifetimes for variables (line-based or time-based)  
+- 🔥 Live token deletion at runtime (even keywords and operators)  
+- 🔥 Deep .NET interoperability via `IMPORT`  
+- 🔥 Execution reversal (`REVERSE`) to flip program flow upward  
+- 🔥 Flexible string handling (quotes optional)  
+- 🔥 Number names (`one`, `two`, etc.) are built-in  
+
+*Credits to [GulfOfMexico](https://github.com/TodePond/GulfOfMexico) for inspiring some ideas.*
+
+---
+
+## 📚 Table of Contents
 
 - [Directives](#directives)  
 - [Functions](#functions)  
 - [Top-level Statements](#top-level-statements)  
-- [Variables and Assignment](#variables-and-assignment)  
+- [Variables, Assignment, and Lifetimes](#variables-assignment-and-lifetimes)  
+- [Strings](#strings)  
 - [Expressions Everywhere](#expressions-everywhere)  
 - [Supported Literals and Types](#supported-literals-and-types)  
 - [Built-in and Inline Calls](#built-in-and-inline-calls)  
@@ -27,39 +38,40 @@ Lumina is a lightweight, dynamic programming language featuring:
 
 ---
 
-## Directives
+## 📥 Directives
 
 - `IMPORT "<path>"`  
-  Loads a .NET assembly for external function calls.
+  Load a .NET assembly to use external functions.
 
 ---
 
-## Functions
+## 🛠️ Functions
 
-- **Keyword**: any subsequence of **FUNCTION** (case-insensitive):  
-  e.g., `F`, `FN`, `FUNC`, `FCTION`, `FUNCTION`  
+- **Keyword**: any part of **FUNCTION** (case-insensitive):  
+  (`F`, `FN`, `FUNC`, `FCTION`, `FUNCTION`, etc.)
+
 - **Syntax**:
   ```text
   <FnKeyword> <Name>
-    …statements…
+    ...statements...
   END
   ```
 
 - **Function names**:  
-  Like variables, function names can be *anything* — numbers, emojis, symbols, etc.
+  Can be anything — numbers, emojis, symbols.
 
   **Examples**:
   ```text
   F 😂
-    !PRINTLINE "This is funny"
+    !PRINTLINE "Funny!"
   END
 
   F 123
-    !PRINTLINE "Number function"
+    !PRINTLINE "Number fn"
   END
 
   F !
-    !PRINTLINE "Exclamation function!"
+    !PRINTLINE "Exclamation!"
   END
   ```
 
@@ -70,74 +82,120 @@ Lumina is a lightweight, dynamic programming language featuring:
   !!
   ```
 
-- **Notes**:
-  - Functions only run when called.
-  - No automatic `MAIN` function or entry point.
+- **Note**:  
+  Functions are **only run when called**.  
+  There's no automatic `MAIN`.
 
 ---
 
-## Top-level Statements
+## 🏃 Top-level Statements
 
-Any statement outside a function runs immediately, in order:
+Anything outside a function runs **instantly** when encountered:
 
 ```text
-!PRINTLINE "Hello"
+!PRINTLINE "Hello world"
 x: 10
 !PRINTLINE x * 2
 ```
 
 ---
 
-## Variables and Assignment
+## 🪄 Variables, Assignment, and Lifetimes
 
-- **Arbitrary names**: numbers, emojis, symbols — anything is allowed.  
+### Assignment
+- **Syntax**:
+  ```text
+  Name: <expression>
+  ```
+
+- **Anything can be a name**:  
+  Numbers, emojis, symbols — even full sentences.
+
   ```text
   😂: "hello"
   3: 55
   $x!: 42
   ```
-- **Assignment syntax**:
+  
+### Lifetimes
+- Variables can **expire** automatically:
+
+  - **`X 2: 5`** → exists for **2 lines**  
+  - **`B 5s: "hey"`** → exists for **5 seconds**  
+  - **`B -3: '''bye'''`** → existed 3 lines ago; gets deleted **now**
+
+  **Examples**:
   ```text
-  VariableName: <expression>
+  X 2: 5          # 2 lines lifetime
+  B 5s: "hello"   # 5 seconds lifetime
+  B -3: '''goodbye''' # retroactive deletion
   ```
 
 ---
 
-## Expressions Everywhere
+## ✨ Strings
 
-- Operators: `+`, `-`, `*`, `/`, `%`  
-- Parentheses for grouping: `(` `)`  
-- Expressions appear in assignments, calls, `RETURN`, etc.
+- **Multi-quote support**:  
+  Triple, quadruple, or any amount of `"` or `'` is valid.
+- **No quotes needed**:  
+  If a matching variable exists, it's used automatically.
+
+  **Examples**:
+  ```text
+  """HELLO"""   # a real string
+
+  !PRINTLINE hello
+  # If variable `hello` exists, it's used.
+  ```
 
 ---
 
-## Supported Literals and Types
+## ➗ Expressions Everywhere
 
-- **Numbers**: e.g., `123`, `-5`, `0.75`
-- **Strings**: `"hello world"`
+- Math operators: `+`, `-`, `*`, `/`, `%`
+- Grouping: `(` `)`  
+- Expressions can appear **anywhere** — assignments, returns, function calls.
+
+---
+
+## 📏 Supported Literals and Types
+
+- **Numbers**: `123`, `-7`, `3.14`
+- **Strings**: `"hello"`, `"""triple quoted"""`, `''''any number''''`
 - **Booleans**: `TRUE`, `FALSE`
+- **Number names** (automatic mappings):
+  ```text
+  one  → 1
+  two  → 2
+  three → 3
+  ```
+
+  **Example**:
+  ```text
+  !PRINTLINE one    # prints 1
+  !PRINTLINE two+two # prints 4
+  ```
 
 ---
 
-## Built-in and Inline Calls
+## ⚡ Built-in and Inline Calls
 
-- **Inline call syntax**:
+- **Call syntax**:
   ```text
   !FunctionName <expr> [<expr> …]
   ```
-- **Built-in functions**:
-  - `!PRINTLINE <value>` — prints evaluated value(s) to console  
 
-- **External functions**:
-  - Any public static method from imported .NET assemblies.
+- **Built-in**:
+  - `!PRINTLINE <value>` → prints the evaluated value(s)
+
+- **External**:
+  - Any public static function from imported .NET assemblies.
 
 ---
 
-## Reversing Execution
+## 🔄 Reversing Execution
 
-- **`REVERSE`**  
-  Flips the direction of top-level execution.  
-  After `REVERSE`, code runs *upward* instead of downward.
+- `REVERSE` switches **program flow direction**.
 
 Example:
 
@@ -157,21 +215,23 @@ REVERSE
 1
 ```
 
-**Explanation**:  
-- First, it prints `1` and `2`.
-- `REVERSE` is hit.
-- Now execution goes *up*, printing `2` (again) and `1` (again).
+**How it works**:  
+- Print `1`, then `2`.
+- `REVERSE` triggers.
+- Now runs upward: `2`, then `1` again.
 
-*Yes — code may be visited more than once!*
+*Yes — REVERSE can cause multiple visits!*
 
 ---
 
-Good catch.  
-You're right — **deleting `FN`** (or any other function keyword) **only deletes that specific spelling**, but you could still define functions with other valid abbreviations (like `F`, `FUNC`, `FUNCTION`, etc.).
+🔥 Okay — you want to allow and **document** that you can `DELETE DELETE` itself.
 
-I'll fix that part cleanly in the docs to be 100% accurate.
+Meaning:  
+- After `DELETE DELETE`, you **can no longer delete** anything at all anymore!
 
-Here’s the corrected part for **Deleting Tokens**:
+Super powerful and dangerous, so let's explain it clearly.
+
+I'll add it right inside the **Deleting Tokens** section, and also show a small example:
 
 ---
 
@@ -189,9 +249,13 @@ Disabled tokens cannot be reused as:
 - Variables
 - Anything
 
+**Special Behavior**:
+- You can `DELETE DELETE`.  
+  After doing so, no more tokens can be deleted for the rest of the program.
+
 **Notes**:
 - Deleting a **function keyword** like `FN` disables only that particular abbreviation.  
-  - You can still use other valid versions (like `F`, `FUNC`, `FUNCTION`) until they are deleted too.
+  Other spellings (`F`, `FUNC`, `FUNCTION`, etc.) still work unless separately deleted.
 
 **Examples**:
 
@@ -208,18 +272,16 @@ DELETE +
 
 DELETE FN
 # cannot define functions with 'FN' anymore
-# but 'F', 'FUNC', 'FUNCTION' still work unless deleted
+# but 'F', 'FUNC', 'FUNCTION' still work
+
+DELETE DELETE
+# now the DELETE keyword itself is disabled
+# no further tokens can be deleted after this
 ```
 
 ---
 
-## Error Handling
+## ❗ Error Handling
 
-Any error (like undefined or deleted token usage, bad syntax, divide-by-zero, unknown function, etc.) immediately aborts execution with an error message.
-
----
-
-**✅ Updated** exactly as you wanted — explained the full freedom for function names and added calling `!!`.  
-
-Want me to also make a short **quickstart example** program (like 10 lines) at the bottom? It would help new users jump in even faster. 🚀  
-Want it?
+- Any error — undefined token, deleted keyword, bad math, etc. — **instantly aborts** execution with an error message.
+```
