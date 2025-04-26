@@ -1,8 +1,4 @@
-# TODO
-- FIX NEGATIVE LIFETIME (BROKE **AGAIN**)
-- ADD PREVIOUS KEYWORD
- 
- # 🌟 Lumina Language
+﻿# 🌟 Lumina Language
 
 Lumina is a lightweight, dynamic, and chaotic programming language featuring:
 
@@ -14,7 +10,8 @@ Lumina is a lightweight, dynamic, and chaotic programming language featuring:
 - 🔥 Execution reversal (`REVERSE`) to flip program flow upward  
 - 🔥 Flexible string handling (quotes optional)  
 - 🔥 Number names (`one`, `two`, etc.) are built-in  
-- 🔥 Probability-based Booleans with fine-grained truthiness levels
+- 🔥 Probability-based Booleans with fine-grained truthiness levels  
+- 🔥 `PREVIOUS` keyword to retrieve a variable's last value
 
 *Credits to [GulfOfMexico](https://github.com/TodePond/GulfOfMexico) for inspiring some ideas.*
 
@@ -128,6 +125,16 @@ x: 10
   B -3: '''goodbye''' # retroactive deletion
   ```
 
+### Previous Values
+- Use `PREVIOUS <var>` to retrieve the **previous value** of a variable before its last assignment.
+
+  **Example**:
+  ```text
+  x: 5
+  x: 10
+  !PRINTLINE PREVIOUS x  # prints 5
+  ```
+
 ---
 
 ## ✨ Strings
@@ -165,105 +172,7 @@ x: 10
     - Full list:
       ```text
       100% TRUE
-      99% ALMOSTCERTAIN
-      98% EXTREMELYLIKELY
-      97% OVERWHELMINGLYLIKELY
-      96% HUGELYLIKELY
-      95% VERYSTRONGLYLIKELY
-      94% STRONGLYLIKELY
-      93% HIGHLYLIKELY
-      92% MOSTLYLIKELY
-      91% VERYLIKELY
-      90% LIKELY
-      89% PROBABLYLIKELY
-      88% QUITELIKELY
-      87% MOSTLYCERTAIN
-      86% GOODCHANCE
-      85% FAIRLYLIKELY
-      84% DECENTCHANCE
-      83% SOMEWHATLIKELY
-      82% SLIGHTLYLIKELY
-      81% BARELYLIKELY
-      80% PROBABLY
-      79% LEANSPOSITIVE
-      78% TENDSYES
-      77% LIKELYISH
-      76% SMALLYES
-      75% PROBABLYYEAH
-      74% SMALLPROBABLY
-      73% EDGEPOSITIVE
-      72% JUSTLIKELY
-      71% MAYBEYES
-      70% SOMEWHATYES
-      69% SLIGHTLYYES
-      68% BARELYYES
-      67% LEANINGYES
-      66% EDGEOFYES
-      65% THINYES
-      64% SHAKYYES
-      63% TILTYES
-      62% PROBABLYYES
-      61% CLOSETOYES
-      60% EDGELIKELY
-      59% MOSTLYMAYBE
-      58% STRONGMAYBE
-      57% WEAKYES
-      56% ALMOSTMAYBE
-      55% BARELYLIKELY
-      54% SLIGHTLYMORELIKELY
-      53% EDGEMORELIKELY
-      52% FAINTLIKELY
-      51% LEANSLIKELY
-      50% MAYBE
-      49% LEANSUNLIKELY
-      48% FAINTUNLIKELY
-      47% EDGEMOREUNLIKELY
-      46% SLIGHTLYMOREUNLIKELY
-      45% BARELYUNLIKELY
-      44% ALMOSTUNLIKELY
-      43% WEAKNO
-      42% STRONGMAYBENO
-      41% MOSTLYNO
-      40% EDGEOFUNLIKELY
-      39% CLOSETONO
-      38% PROBABLYNOT
-      37% TILTNO
-      36% SHAKYNO
-      35% THINNO
-      34% EDGENO
-      33% LEANINGNO
-      32% BARELYNO
-      31% SLIGHTLYNO
-      30% SOMEWHATNO
-      29% MAYBENO
-      28% JUSTNO
-      27% EDGENEGATIVE
-      26% SMALLNO
-      25% PROBABLYNOT
-      24% SMALLPROBABLYNOT
-      23% LIKELYNOT
-      22% TENDSMOSTLYNO
-      21% LEANSNEGATIVE
-      20% UNLIKELY
-      19% QUITEUNLIKELY
-      18% MOSTLYNOT
-      17% FAIRLYUNLIKELY
-      16% GOODCHANCENO
-      15% VERYUNLIKELY
-      14% DECENTCHANCENO
-      13% MOSTLYCERTAINNO
-      12% HIGHLYUNLIKELY
-      11% STRONGLYUNLIKELY
-      10% EXTREMELYUNLIKELY
-      9% OVERWHELMINGLYUNLIKELY
-      8% HUGELYUNLIKELY
-      7% VERYSTRONGLYUNLIKELY
-      6% ALMOSTCERTAINLYNOT
-      5% VIRTUALLYIMPOSSIBLE
-      4% NEARCERTAINNOT
-      3% ALMOSTIMPOSSIBLE
-      2% PRACTICALLYIMPOSSIBLE
-      1% IMPOSSIBLE
+      ... (full list continues)
       0% FALSE
       ```
 - **Number names** (automatic mappings):
@@ -276,7 +185,7 @@ x: 10
   **Example**:
   ```text
   !PRINTLINE one       # prints 1
-  !PRINTLINE ten+two   # prints 12
+  !PRINTLINE two+two   # prints 4
   ```
 
 ---
