@@ -1,4 +1,8 @@
-﻿# 🌟 Lumina Language
+# TODO
+- FIX NEGATIVE LIFETIME (BROKE **AGAIN**)
+- ADD PREVIOUS KEYWORD
+ 
+ # 🌟 Lumina Language
 
 Lumina is a lightweight, dynamic, and chaotic programming language featuring:
 
