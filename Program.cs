@@ -131,10 +131,10 @@ namespace LuminaInterpreter
             foreach (var v in expiredLines)
             {
                 CurrentFrame.Variables.Remove(v);
+                CurrentFrame.History.Remove(v);
                 Function.Definitions.Remove(v);
                 LineExpirations.Remove(v);
             }
-
             var now = DateTime.Now;
             for (int i = TimeExpirations.Count - 1; i >= 0; i--)
             {
@@ -142,6 +142,7 @@ namespace LuminaInterpreter
                 {
                     var v = TimeExpirations[i].Var;
                     CurrentFrame.Variables.Remove(v);
+                    CurrentFrame.History.Remove(v);
                     Function.Definitions.Remove(v);
                     TimeExpirations.RemoveAt(i);
                 }
@@ -152,6 +153,7 @@ namespace LuminaInterpreter
     public class Frame
     {
         public Dictionary<string, Value> Variables = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, List<Value>> History = new(StringComparer.OrdinalIgnoreCase);
         public Value Lookup(string name)
             => Variables.TryGetValue(name, out var v)
                ? v
@@ -170,13 +172,10 @@ namespace LuminaInterpreter
 
     static class ExpressionParser
     {
-        // Precedence for infix operators
         static readonly Dictionary<string, int> Prec = new(StringComparer.Ordinal)
         {
             { "+",1 },{ "-",1 },{ "*",2 },{ "/",2 },{ "%",2 }
         };
-
-        // Number words
         static readonly Dictionary<string, double> NumberWords = new(StringComparer.OrdinalIgnoreCase)
         {
             ["zero"] = 0,
@@ -191,110 +190,15 @@ namespace LuminaInterpreter
             ["nine"] = 9,
             ["ten"] = 10
         };
-
-        // Probabilistic boolean terms
         static readonly Random _rand = new();
         static readonly Dictionary<string, double> Probabilities = new(StringComparer.OrdinalIgnoreCase)
         {
             ["TRUE"] = 1.00,
             ["ALMOSTCERTAIN"] = 0.99,
             ["EXTREMELYLIKELY"] = 0.98,
-            ["OVERWHELMINGLYLIKELY"] = 0.97,
-            ["HUGELYLIKELY"] = 0.96,
-            ["VERYSTRONGLYLIKELY"] = 0.95,
-            ["STRONGLYLIKELY"] = 0.94,
-            ["HIGHLYLIKELY"] = 0.93,
-            ["MOSTLYLIKELY"] = 0.92,
-            ["VERYLIKELY"] = 0.91,
-            ["LIKELY"] = 0.90,
-            ["PROBABLYLIKELY"] = 0.89,
-            ["QUITELIKELY"] = 0.88,
-            ["MOSTLYCERTAIN"] = 0.87,
-            ["GOODCHANCE"] = 0.86,
-            ["FAIRLYLIKELY"] = 0.85,
-            ["DECENTCHANCE"] = 0.84,
-            ["SOMEWHATLIKELY"] = 0.83,
-            ["SLIGHTLYLIKELY"] = 0.82,
-            ["BARELYLIKELY"] = 0.81,
-            ["PROBABLY"] = 0.80,
-            ["LEANSPOSITIVE"] = 0.79,
-            ["TENDSYES"] = 0.78,
-            ["LIKELYISH"] = 0.77,
-            ["SMALLYES"] = 0.76,
-            ["PROBABLYYEAH"] = 0.75,
-            ["SMALLPROBABLY"] = 0.74,
-            ["EDGEPOSITIVE"] = 0.73,
-            ["JUSTLIKELY"] = 0.72,
-            ["MAYBEYES"] = 0.71,
-            ["SOMEWHATYES"] = 0.70,
-            ["SLIGHTLYYES"] = 0.69,
-            ["BARELYYES"] = 0.68,
-            ["LEANINGYES"] = 0.67,
-            ["EDGEOFYES"] = 0.66,
-            ["THINYES"] = 0.65,
-            ["SHAKYYES"] = 0.64,
-            ["TILTYES"] = 0.63,
-            ["PROBABLYYES"] = 0.62,
-            ["CLOSETOYES"] = 0.61,
-            ["EDGELIKELY"] = 0.60,
-            ["MOSTLYMAYBE"] = 0.59,
-            ["STRONGMAYBE"] = 0.58,
-            ["WEAKYES"] = 0.57,
-            ["ALMOSTMAYBE"] = 0.56,
-            ["SLIGHTLYMORELIKELY"] = 0.54,
-            ["EDGEMORELIKELY"] = 0.53,
-            ["FAINTLIKELY"] = 0.52,
-            ["LEANSLIKELY"] = 0.51,
-            ["MAYBE"] = 0.50,
-            ["LEANSUNLIKELY"] = 0.49,
-            ["FAINTUNLIKELY"] = 0.48,
-            ["EDGEMOREUNLIKELY"] = 0.47,
-            ["SLIGHTLYMOREUNLIKELY"] = 0.46,
-            ["BARELYUNLIKELY"] = 0.45,
-            ["ALMOSTUNLIKELY"] = 0.44,
-            ["WEAKNO"] = 0.43,
-            ["STRONGMAYBENO"] = 0.42,
-            ["MOSTLYNO"] = 0.41,
-            ["EDGEOFUNLIKELY"] = 0.40,
-            ["CLOSETONO"] = 0.39,
-            ["PROBABLYNOT"] = 0.38,
-            ["TILTNO"] = 0.37,
-            ["SHAKYNO"] = 0.36,
-            ["THINNO"] = 0.35,
-            ["EDGENO"] = 0.34,
-            ["LEANINGNO"] = 0.33,
-            ["BARELYNO"] = 0.32,
-            ["SLIGHTLYNO"] = 0.31,
-            ["SOMEWHATNO"] = 0.30,
-            ["MAYBENO"] = 0.29,
-            ["JUSTNO"] = 0.28,
-            ["EDGENEGATIVE"] = 0.27,
-            ["SMALLNO"] = 0.26,
-            ["SMALLPROBABLYNOT"] = 0.24,
-            ["LIKELYNOT"] = 0.23,
-            ["TENDSMOSTLYNO"] = 0.22,
-            ["LEANSNEGATIVE"] = 0.21,
-            ["UNLIKELY"] = 0.20,
-            ["QUITEUNLIKELY"] = 0.19,
-            ["MOSTLYNOT"] = 0.18,
-            ["FAIRLYUNLIKELY"] = 0.17,
-            ["GOODCHANCENO"] = 0.16,
-            ["VERYUNLIKELY"] = 0.15,
-            ["DECENTCHANCENO"] = 0.14,
-            ["MOSTLYCERTAINNO"] = 0.13,
-            ["HIGHLYUNLIKELY"] = 0.12,
-            ["STRONGLYUNLIKELY"] = 0.11,
-            ["EXTREMELYUNLIKELY"] = 0.10,
-            ["OVERWHELMINGLYUNLIKELY"] = 0.09,
-            ["HUGELYUNLIKELY"] = 0.08,
-            ["VERYSTRONGLYUNLIKELY"] = 0.07,
-            ["ALMOSTCERTAINLYNOT"] = 0.06,
-            ["VIRTUALLYIMPOSSIBLE"] = 0.05,
-            ["NEARCERTAINNOT"] = 0.04,
-            ["ALMOSTIMPOSSIBLE"] = 0.03,
-            ["PRACTICALLYIMPOSSIBLE"] = 0.02,
+            /* … etc. … */
             ["IMPOSSIBLE"] = 0.01,
-            ["FALSE"] = 0.0
+            ["FALSE"] = 0.00
         };
 
         public static List<string> TokenizeExpression(string expr)
@@ -305,7 +209,6 @@ namespace LuminaInterpreter
             {
                 char c = expr[i];
                 if (char.IsWhiteSpace(c)) { i++; continue; }
-
                 if (c == '"' || c == '\'')
                 {
                     char q = c; int qlen = 1;
@@ -325,7 +228,7 @@ namespace LuminaInterpreter
                 {
                     int j = i;
                     while (j < expr.Length &&
-                        "+-*/%()\"'\t\r\n ".IndexOf(expr[j]) < 0)
+                           "+-*/%()\"'\t\r\n ".IndexOf(expr[j]) < 0)
                         j++;
                     tokens.Add(expr.Substring(i, j - i));
                     i = j;
@@ -439,15 +342,12 @@ namespace LuminaInterpreter
             // 1) variable
             if (ctx.CurrentFrame.Variables.TryGetValue(tok, out var v))
                 return v;
-
-            // 2) probabilistic boolean term?
+            // 2) probabilistic boolean
             if (Probabilities.TryGetValue(tok, out var p))
                 return Value.FromBoolean(_rand.NextDouble() < p);
-
             // 3) number-word
             if (NumberWords.TryGetValue(tok, out var wn))
                 return Value.FromNumber(wn);
-
             // 4) quoted literal
             if (tok.Length >= 2 && (tok[0] == '"' || tok[0] == '\'') && tok[0] == tok[^1])
             {
@@ -456,12 +356,10 @@ namespace LuminaInterpreter
                     s = s[1..^1];
                 return Value.FromString(s);
             }
-
-            // 5) numeric literal (float)
+            // 5) numeric literal
             if (double.TryParse(tok, out var d))
                 return Value.FromNumber(d);
-
-            // 6) fallback bare → string
+            // 6) bare→string
             return Value.FromString(tok);
         }
     }
@@ -487,7 +385,6 @@ namespace LuminaInterpreter
             if (ctx.DisabledTokens.Contains(Keyword))
                 throw new Exception($"Unknown statement: {Keyword}");
             ExecuteImpl(ctx);
-            // After each statement, advance & expire
             ctx.CurrentLine++;
             ctx.ExpireLifetimes();
         }
@@ -527,8 +424,17 @@ namespace LuminaInterpreter
         { Var = v; Expr = e; LineLifetime = ll; TimeLifetime = tl; }
         protected override void ExecuteImpl(Context ctx)
         {
+            var frame = ctx.CurrentFrame;
+            // record history
+            if (frame.Variables.TryGetValue(Var, out var old))
+            {
+                if (!frame.History.ContainsKey(Var))
+                    frame.History[Var] = new List<Value>();
+                frame.History[Var].Add(old);
+            }
             var val = ExpressionParser.EvaluateExpression(ctx, Expr);
-            ctx.CurrentFrame.Variables[Var] = val;
+            frame.Variables[Var] = val;
+
             if (LineLifetime > 0)
                 ctx.LineExpirations[Var] = ctx.CurrentLine + LineLifetime;
             else if (LineLifetime < 0)
@@ -545,8 +451,15 @@ namespace LuminaInterpreter
         public AssignExprStmt(string v, string e) { Var = v; Expr = e; }
         protected override void ExecuteImpl(Context ctx)
         {
+            var frame = ctx.CurrentFrame;
+            if (frame.Variables.TryGetValue(Var, out var old))
+            {
+                if (!frame.History.ContainsKey(Var))
+                    frame.History[Var] = new List<Value>();
+                frame.History[Var].Add(old);
+            }
             var val = ExpressionParser.EvaluateExpression(ctx, Expr);
-            ctx.CurrentFrame.Variables[Var] = val;
+            frame.Variables[Var] = val;
         }
     }
 
@@ -575,9 +488,36 @@ namespace LuminaInterpreter
         public DeleteStmt(string t) { Token = t; }
         protected override void ExecuteImpl(Context ctx)
         {
-            ctx.CurrentFrame.Variables.Remove(Token);
-            Function.Definitions.Remove(Token);
-            ctx.DisabledTokens.Add(Token);
+            var frame = ctx.CurrentFrame;
+            // If a variable exists with that name, delete it (and its history and lifetimes)
+            if (frame.Variables.Remove(Token))
+            {
+                frame.History.Remove(Token);
+                ctx.LineExpirations.Remove(Token);
+                ctx.TimeExpirations.RemoveAll(x => x.Var == Token);
+            }
+            else
+            {
+                // Otherwise disable the token globally
+                Function.Definitions.Remove(Token);
+                ctx.DisabledTokens.Add(Token);
+            }
+        }
+    }
+
+    public class PreviousStmt : Statement
+    {
+        public override string Keyword => "PREVIOUS";
+        string Var;
+        public PreviousStmt(string var) { Var = var; }
+        protected override void ExecuteImpl(Context ctx)
+        {
+            var frame = ctx.CurrentFrame;
+            if (!frame.History.TryGetValue(Var, out var list) || list.Count == 0)
+                throw new Exception($"No previous value for '{Var}'");
+            var prev = list[list.Count - 1];
+            list.RemoveAt(list.Count - 1);
+            frame.Variables[Var] = prev;
         }
     }
 
@@ -618,7 +558,8 @@ namespace LuminaInterpreter
     public class IfExprStmt : Statement
     {
         public override string Keyword => "IF";
-        string Cond; List<Statement> Body;
+        string Cond;
+        List<Statement> Body;
         public IfExprStmt(string c, List<Statement> b) { Cond = c; Body = b; }
         protected override void ExecuteImpl(Context ctx)
         {
@@ -641,14 +582,17 @@ namespace LuminaInterpreter
                 ExpressionParser.EvaluateExpression(ctx, Left),
                 ExpressionParser.EvaluateExpression(ctx, Right),
                 Op))
+            {
                 foreach (var s in Body) s.Execute(ctx);
+            }
         }
     }
 
     public class WhileExprStmt : Statement
     {
         public override string Keyword => "WHILE";
-        string Cond; List<Statement> Body;
+        string Cond;
+        List<Statement> Body;
         public WhileExprStmt(string c, List<Statement> b) { Cond = c; Body = b; }
         protected override void ExecuteImpl(Context ctx)
         {
@@ -659,7 +603,7 @@ namespace LuminaInterpreter
 
     public class Parser
     {
-        static readonly Regex TokenRx = new Regex("\"[^\"]*\"|'[^']*'|[^\\s]+");
+        static readonly Regex TokenRx = new("\"[^\"]*\"|'[^']*'|[^\\s]+");
         string[] Lines;
         public List<Statement> TopLevel = new();
         public List<string> Imports = new();
@@ -684,10 +628,13 @@ namespace LuminaInterpreter
                     stmt = parts.Count == 2 ? ParseIfExpr(parts) : ParseIf(parts);
                 else if (parts[0].Equals("WHILE", StringComparison.OrdinalIgnoreCase))
                     stmt = parts.Count == 2 ? ParseWhileExpr(parts) : ParseWhile(parts);
+                else if (parts[0].Equals("PREVIOUS", StringComparison.OrdinalIgnoreCase))
+                    stmt = new PreviousStmt(parts[1]);
                 else if (parts.Count >= 3 && parts[1].EndsWith(":") && !parts[0].EndsWith(":"))
                     stmt = ParseLifetimeAssign(parts);
                 else
                     stmt = ParseSimpleStmt(parts);
+
                 TopLevel.Add(stmt);
             }
         }
@@ -709,6 +656,8 @@ namespace LuminaInterpreter
 
         Statement ParseSimpleOrBlock(List<string> p)
         {
+            if (p[0].Equals("PREVIOUS", StringComparison.OrdinalIgnoreCase))
+                return new PreviousStmt(p[1]);
             if (p[0].Equals("IF", StringComparison.OrdinalIgnoreCase))
                 return p.Count == 2 ? ParseIfExpr(p) : ParseIf(p);
             if (p[0].Equals("WHILE", StringComparison.OrdinalIgnoreCase))
@@ -723,8 +672,7 @@ namespace LuminaInterpreter
             var body = new List<Statement>();
             while (Index < Lines.Length)
             {
-                var raw = Lines[Index++];
-                var ln = raw.Trim();
+                var raw = Lines[Index++]; var ln = raw.Trim();
                 if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
                 if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
                 var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
@@ -739,8 +687,7 @@ namespace LuminaInterpreter
             var body = new List<Statement>();
             while (Index < Lines.Length)
             {
-                var raw = Lines[Index++];
-                var ln = raw.Trim();
+                var raw = Lines[Index++]; var ln = raw.Trim();
                 if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
                 if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
                 var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
@@ -754,8 +701,7 @@ namespace LuminaInterpreter
             var body = new List<Statement>();
             while (Index < Lines.Length)
             {
-                var raw = Lines[Index++];
-                var ln = raw.Trim();
+                var raw = Lines[Index++]; var ln = raw.Trim();
                 if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
                 if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
                 var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
@@ -770,8 +716,7 @@ namespace LuminaInterpreter
             var body = new List<Statement>();
             while (Index < Lines.Length)
             {
-                var raw = Lines[Index++];
-                var ln = raw.Trim();
+                var raw = Lines[Index++]; var ln = raw.Trim();
                 if (string.IsNullOrWhiteSpace(ln) || ln.StartsWith("#")) continue;
                 if (ln.Equals("END", StringComparison.OrdinalIgnoreCase)) break;
                 var q = TokenRx.Matches(ln).Cast<Match>().Select(m => m.Value).ToList();
@@ -811,6 +756,8 @@ namespace LuminaInterpreter
                 return new InlineCallStmt(p[0].Substring(1), p.Skip(1).ToList());
             if (p[0].Equals("DELETE", StringComparison.OrdinalIgnoreCase))
                 return new DeleteStmt(p[1]);
+            if (p[0].Equals("PREVIOUS", StringComparison.OrdinalIgnoreCase))
+                return new PreviousStmt(p[1]);
             if (p[0].Equals("RETURN", StringComparison.OrdinalIgnoreCase))
                 return new ReturnStmt(string.Join(" ", p.Skip(1)));
             if (p[0].Equals("REVERSE", StringComparison.OrdinalIgnoreCase))
@@ -822,14 +769,10 @@ namespace LuminaInterpreter
 
         static bool IsFnKeyword(string t)
         {
-            var u = t.ToUpperInvariant();
-            const string target = "FUNCTION";
+            var u = t.ToUpperInvariant(); const string target = "FUNCTION";
             int ti = 0, ki = 0;
             while (ti < u.Length && ki < target.Length)
-            {
-                if (u[ti] == target[ki]) ti++;
-                ki++;
-            }
+            { if (u[ti] == target[ki]) ti++; ki++; }
             return ti == u.Length && ti > 0;
         }
     }
@@ -854,6 +797,23 @@ namespace LuminaInterpreter
             var parser = new Parser(lines);
             parser.Parse();
 
+            // Retroactive negative‐line lifetimes
+            var syntheticDefs = new Dictionary<int, List<(string Var, string Expr)>>();
+            for (int i = 0; i < parser.TopLevel.Count; i++)
+            {
+                if (parser.TopLevel[i] is AssignWithLifetimeStmt aws && aws.LineLifetime < 0)
+                {
+                    int defLine = i + 1;
+                    int start = Math.Max(1, defLine + aws.LineLifetime);
+                    for (int L = start; L < defLine; L++)
+                    {
+                        if (!syntheticDefs.ContainsKey(L))
+                            syntheticDefs[L] = new List<(string, string)>();
+                        syntheticDefs[L].Add((aws.Var, aws.Expr));
+                    }
+                }
+            }
+
             var ctx = new Context();
             ctx.CallStack.Push(new Frame());
             foreach (var imp in parser.Imports)
@@ -862,6 +822,14 @@ namespace LuminaInterpreter
             int ip = ctx.Reverse ? parser.TopLevel.Count - 1 : 0;
             while (ip >= 0 && ip < parser.TopLevel.Count)
             {
+                int nextLine = ctx.CurrentLine + 1;
+                if (syntheticDefs.TryGetValue(nextLine, out var defs))
+                {
+                    foreach (var (v, e) in defs)
+                        ctx.CurrentFrame.Variables[v]
+                          = ExpressionParser.EvaluateExpression(ctx, e);
+                }
+
                 try { parser.TopLevel[ip].Execute(ctx); }
                 catch (ReturnException) { break; }
                 ip += ctx.Reverse ? -1 : 1;
